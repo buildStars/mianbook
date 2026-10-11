@@ -127,6 +127,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <ElDropdownItem @click="navigateTo('/progress')">我的进度</ElDropdownItem>
               <ElDropdownItem @click="navigateTo('/review')">今日复习{{ dueToday ? `（${dueToday}）` : '' }}</ElDropdownItem>
               <ElDropdownItem @click="navigateTo('/mock')">模拟面试</ElDropdownItem>
+              <ElDropdownItem @click="navigateTo('/report')">学习周报</ElDropdownItem>
               <ElDropdownItem v-if="user?.role === 'admin'" @click="navigateTo('/admin')">管理后台</ElDropdownItem>
               <ElDropdownItem divided @click="logout">退出登录</ElDropdownItem>
             </ElDropdownMenu>

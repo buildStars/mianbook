@@ -25,6 +25,14 @@ const hidden = computed(() => quiz.value && !revealed.value)
 
 const interview = ref<{ open: () => void }>()
 
+// 学习周报用：记录有效阅读时长，以及自测模式里查看答案
+useReadingTime(() => question.value?.id)
+const { track } = useLearningEvents()
+function reveal() {
+  revealed.value = true
+  if (question.value) track({ type: 'reveal', questionId: question.value.id })
+}
+
 // 记住看到哪道题，首页提供"继续上次"
 const { save: saveLastVisited } = useLastVisited()
 const remember = () => {
@@ -50,7 +58,7 @@ watch(() => question.value?.id, remember)
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" /></svg>
               让 AI 考我
             </button>
-            <button type="button" class="btn btn-primary" @click="revealed = true">查看答案</button>
+            <button type="button" class="btn btn-primary" @click="reveal">查看答案</button>
           </div>
         </div>
       </div>

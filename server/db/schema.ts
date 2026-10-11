@@ -219,3 +219,24 @@ export const reviewLogs = mysqlTable(
   },
   (t) => [index('review_logs_user_created_idx').on(t.userId, t.createdAt)],
 )
+
+/**
+ * 学习行为事件，用于学习周报。只记已有表里没有的：阅读时长、自测时查看答案、语音作答。
+ * 面试、模拟面试、复习评分已经各有记录，不在这里重复。不记录任何回答内容
+ */
+export const events = mysqlTable(
+  'events',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    userId: int('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** read 阅读一道题、reveal 自测模式里查看答案、voice 用语音作答 */
+    type: varchar('type', { length: 16 }).notNull(),
+    questionId: int('question_id').references(() => questions.id, { onDelete: 'cascade' }),
+    /** read、voice 是秒数 */
+    value: int('value'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('events_user_created_idx').on(t.userId, t.createdAt)],
+)

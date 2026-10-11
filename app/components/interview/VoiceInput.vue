@@ -13,6 +13,13 @@ watch(
   (d) => d && stop(),
 )
 
+// 学习周报用：记录这次说了多久（不记录内容）
+const { track } = useLearningEvents()
+const recordVoice = () => seconds.value > 0 && track({ type: 'voice', value: Math.min(seconds.value, 1800) })
+watch(listening, (on, wasOn) => wasOn && !on && recordVoice())
+// 说着话直接提交时，组件会在停止前被卸载
+onBeforeUnmount(() => listening.value && recordVoice())
+
 const clock = computed(() => `${Math.floor(seconds.value / 60)}:${String(seconds.value % 60).padStart(2, '0')}`)
 defineExpose({ stop })
 </script>

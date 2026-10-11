@@ -15,6 +15,13 @@
       "when": 1791721988192,
       "tag": "0001_review_and_mock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791726671175,
+      "tag": "0002_events",
+      "breakpoints": true
     }
   ]
 }

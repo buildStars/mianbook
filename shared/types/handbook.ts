@@ -221,3 +221,51 @@ export interface CategoryInsight {
   /** 今天到期要复习的题数 */
   due: number
 }
+
+/** 学习周报里一周的汇总数字 */
+export interface WeekStats {
+  /** 阅读题目的有效时长（秒） */
+  studySeconds: number
+  /** 有学习记录的天数（阅读、复习、面试任意一种） */
+  activeDays: number
+  /** 读过的题数 */
+  questionsRead: number
+  /** 复习评分次数（复习页、题目页标记、AI 面试第一轮都算） */
+  reviews: number
+  /** 第一次加入复习计划的题数 */
+  newQuestions: number
+  /** AI 面试过的题数（单题和模拟面试） */
+  interviews: number
+  /** 这些面试第一轮的平均分 */
+  interviewAvg: number | null
+  /** 完成的整场模拟面试 */
+  mockFinished: number
+  mockAvg: number | null
+  /** 自测模式里查看答案的次数 */
+  reveals: number
+  /** 语音作答的时长（秒） */
+  voiceSeconds: number
+}
+
+export interface ReportSuggestion {
+  text: string
+  link?: { to: string; label: string }
+}
+
+export interface WeeklyReport {
+  /** 周一到周日（用户所在时区的日期）；offset 0 是本周，-1 是上周 */
+  week: { start: string; end: string; offset: number }
+  current: WeekStats
+  previous: WeekStats
+  /** 本周每天：阅读秒数、复习次数、面试次数 */
+  daily: { date: string; seconds: number; reviews: number; interviews: number }[]
+  /** 最近 8 周（最后一项是这一周）：学习时长和面试平均分 */
+  trend: { start: string; seconds: number; interviewAvg: number | null }[]
+  /** 本周学过的分类，按学习时长排序 */
+  categories: { id: number; title: string; seconds: number; interviews: number; avgScore: number | null; again: number }[]
+  /** 本周最卡的题：AI 面试低分，或者复习时多次答"不会" */
+  stuck: { id: number; title: string; path: string; category: string; reason: string }[]
+  suggestions: ReportSuggestion[]
+  streak: number
+  dueToday: number
+}

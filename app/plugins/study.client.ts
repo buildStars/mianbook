@@ -9,7 +9,11 @@ export default defineNuxtPlugin(() => {
   const { load: loadLastVisited } = useLastVisited()
   const { load: loadAiKey } = useAiKey()
   const { refresh: refreshReview } = useReview()
+  const { flush: flushEvents } = useLearningEvents()
   onNuxtReady(() => {
+    // 学习事件每分钟发一批，关闭页面时用 sendBeacon 补发
+    setInterval(() => flushEvents(), 60_000)
+    window.addEventListener('pagehide', () => flushEvents(true))
     load()
     loadLastVisited()
     loadAiKey()

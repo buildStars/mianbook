@@ -212,7 +212,10 @@ async function onClear() {
       <p v-if="ready && !loggedIn" class="sub">
         当前没有登录，记录只保存在这台设备的浏览器里。<NuxtLink to="/login?redirect=/progress">登录</NuxtLink>后会自动合并到账号。
       </p>
-      <p v-else class="sub">掌握程度、收藏和笔记都会自动保存。没掌握的题，就从这里开始复习。</p>
+      <p v-else class="sub">
+        掌握程度、收藏和笔记都会自动保存。没掌握的题，就从这里开始复习。
+        <NuxtLink v-if="loggedIn" to="/report" class="report-link">看本周学习周报 →</NuxtLink>
+      </p>
     </header>
 
     <!-- 总览 -->
@@ -438,6 +441,11 @@ async function onClear() {
 .sub {
   margin: 10px 0 0;
   color: var(--c-text-2);
+}
+
+.report-link {
+  margin-left: 6px;
+  white-space: nowrap;
 }
 
 /* 总览 */
