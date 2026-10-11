@@ -108,4 +108,36 @@ templates/           新题目的 Markdown 模板和写作规范（writing-guide
 
 ## 部署
 
-`npm run build` 后，用 `node --env-file=.env .output/server/index.mjs` 运行（默认端口 3000，可用 `PORT` 修改）。生产环境请使用正式的 MySQL 实例，修改 `NUXT_DATABASE_URL`，并执行 `npm run db:migrate` 和 `npm run db:import`。
+线上用一台 Ubuntu 24.04 服务器（2 核 4G 够用），Docker 跑三个容器：MySQL 8.4、应用、Caddy。Caddy 负责自动申请和续期 HTTPS 证书。配置都在 `deploy/` 目录里。
+
+**第一次准备**
+
+1. 服务器装好 Docker，用 SSH 密钥登录，防火墙放行 22、80、443
+2. 给域名添加 A 记录（`@` 和 `www`），指向服务器 IP
+3. 在项目根目录新建 `.env.deploy`（不会提交）：
+
+   ```bash
+   DEPLOY_HOST=ubuntu@服务器IP
+   DEPLOY_KEY=~/.ssh/私钥文件
+   DEPLOY_DOMAIN=你的域名
+   ```
+
+4. 执行 `npm run deploy -- --import`：上传代码，在服务器上构建镜像，建表并导入 `content/` 里的题目
+
+第一次部署时，会在服务器的 `/opt/handbook/.env` 里随机生成数据库密码和登录密钥。AI Key 也填在这个文件里，填好后在服务器上执行 `cd /opt/handbook && docker compose up -d app` 生效。
+
+**以后发布**：执行 `npm run deploy`。只发布已经提交的代码，有未提交的修改会提示，但不会上传。上一版代码保留在服务器的 `/opt/handbook/src.prev`。
+
+**题目以线上后台为准**：上线后在线上后台改题。服务器上没有 `content/` 目录，修改只保存在数据库里。本地新写的题要发布时，先提交再执行 `npm run deploy -- --import`。导入不会覆盖线上比文件新的题。
+
+**备份**：服务器每天 03:30 自动备份数据库到 `/opt/handbook/backups`，保留 14 天。`npm run deploy:backup` 会立即备份一次，并下载到本地的 `backups/` 目录。
+
+**常用运维命令**（在服务器的 `/opt/handbook` 目录里执行）：
+
+| 命令 | 作用 |
+| --- | --- |
+| `docker compose ps` | 查看各容器状态 |
+| `docker compose logs -f app` | 查看应用日志 |
+| `docker compose logs caddy` | 查看证书申请情况 |
+| `docker compose up -d app` | 改了 `.env` 之后重启应用 |
+| `docker compose run --rm tools npx tsx scripts/db.ts export /tmp/out` | 把线上题目导出成 Markdown |
