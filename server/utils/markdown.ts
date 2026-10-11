@@ -2,7 +2,7 @@ import { fromHighlighter } from '@shikijs/markdown-it/core'
 import MarkdownIt from 'markdown-it'
 import cjkFriendly from 'markdown-it-cjk-friendly'
 import container from 'markdown-it-container'
-import { createHighlighter } from 'shiki'
+import { createHighlighter, type BundledLanguage } from 'shiki'
 import type { TocItem } from '../../shared/types/handbook'
 
 // 这个文件只依赖 npm 包，导入脚本（scripts/db.ts）也会直接复用
@@ -33,6 +33,12 @@ const LANGS = [
   'toml',
   'dockerfile',
 ]
+
+/**
+ * Shiki 内置的纯文本语言。插件选项的类型只列了可加载的语言，没算上它，运行时是支持的（插件的 defaultLanguage 默认值就是它）。
+ * 不能换成 'plaintext'：插件会把语言名写进代码块的 class，language-text 会变成 language-plaintext
+ */
+const PLAIN_TEXT = 'text' as BundledLanguage
 
 const CONTAINER_TYPES = ['tip', 'info', 'warning', 'danger'] as const
 const DEFAULT_TITLES: Record<string, string> = {
@@ -134,8 +140,8 @@ async function createRenderer() {
   md.use(
     fromHighlighter(highlighter, {
       themes: { light: 'github-light', dark: 'github-dark' },
-      defaultLanguage: 'text',
-      fallbackLanguage: 'text',
+      defaultLanguage: PLAIN_TEXT,
+      fallbackLanguage: PLAIN_TEXT,
     }),
   )
 
@@ -226,7 +232,7 @@ async function createRenderer() {
 
   md.renderer.rules.heading_close = (tokens, idx) => {
     const id = tokens[idx - 2]?.attrGet('id')
-    const anchor = id ? `<a class="header-anchor" href="#${escapeAttr(id)}" aria-hidden="true">#</a>` : ''
+    const anchor = id ? `<a class="header-anchor" href="#${escapeAttr(String(id))}" aria-hidden="true">#</a>` : ''
     return `${anchor}</${tokens[idx]!.tag}>\n`
   }
 
@@ -238,7 +244,7 @@ async function createRenderer() {
   const linkOpen =
     md.renderer.rules.link_open ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-    const href = tokens[idx]!.attrGet('href') ?? ''
+    const href = String(tokens[idx]!.attrGet('href') ?? '')
     if (/^https?:\/\//.test(href)) {
       tokens[idx]!.attrSet('target', '_blank')
       tokens[idx]!.attrSet('rel', 'noopener noreferrer')
@@ -249,7 +255,7 @@ async function createRenderer() {
   return md
 }
 
-let renderer: Promise<MarkdownIt> | undefined
+let renderer: Promise<ReturnType<typeof MarkdownIt>> | undefined
 
 export interface RenderedMarkdown {
   html: string

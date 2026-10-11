@@ -5,7 +5,9 @@ export interface SseEvent {
 
 /** 解析 fetch 返回的 SSE 响应流。网络数据会被任意切块，所以按空行拼出完整事件后再产出 */
 export async function* readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<SseEvent> {
-  const reader = body.pipeThrough(new TextDecoderStream()).getReader()
+  // lib.dom 把 TextDecoderStream 的输入声明成 BufferSource，和 Uint8Array（可能由 SharedArrayBuffer 支撑）对不上，运行时没区别，只在类型上断言
+  const decoder = new TextDecoderStream() as ReadableWritablePair<string, Uint8Array>
+  const reader = body.pipeThrough(decoder).getReader()
   let buffer = ''
   try {
     while (true) {

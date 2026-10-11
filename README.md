@@ -69,6 +69,7 @@ npm run db:start
 | `npm run db:export` | 把数据库里的题目导出到 `content/`，方便备份和用 Git 管理 |
 | `npm run db:rerender` | 修改了 Markdown 渲染规则后，重新生成所有题目的 HTML |
 | `npm run content:check` | 检查 `content/` 里题目的格式（结构、链接、表格等），可以只传分类名，如 `npm run content:check -- react` |
+| `npm run typecheck` | 用 vue-tsc 检查前端、服务端、`shared/` 和 `nuxt.config.ts` 的类型 |
 | `npm run db:generate` | 修改 `server/db/schema.ts` 后生成迁移文件 |
 | `npm run db:migrate` | 执行迁移 |
 | `npm run build` | 构建生产版本，输出到 `.output/` |

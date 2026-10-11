@@ -1,7 +1,7 @@
 import MarkdownIt from 'markdown-it'
 import cjkFriendly from 'markdown-it-cjk-friendly'
 
-let md: MarkdownIt | null = null
+let md: ReturnType<typeof MarkdownIt> | null = null
 
 /**
  * 渲染大模型输出的 Markdown。模型输出可能被提示注入操纵，所以：
