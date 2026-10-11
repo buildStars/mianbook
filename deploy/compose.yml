@@ -1,0 +1,61 @@
+# 生产环境：MySQL + 应用 + Caddy（自动申请和续期 HTTPS 证书）。
+# 部署脚本把这个文件放到服务器的 /opt/handbook/compose.yml，同目录的 .env 里有域名和各项密钥
+name: handbook
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: handbook
+      MYSQL_USER: handbook
+      MYSQL_PASSWORD: ${DB_PASSWORD:?}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql.cnf:/etc/mysql/conf.d/handbook.cnf:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build: { context: ./src, target: app }
+    image: handbook-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NUXT_DATABASE_URL: mysql://handbook:${DB_PASSWORD}@mysql:3306/handbook
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  # 运维工具，不常驻：docker compose run --rm tools npx tsx scripts/db.ts migrate
+  tools:
+    build: { context: ./src, target: tools }
+    image: handbook-tools
+    profiles: [tools]
+    environment:
+      NUXT_DATABASE_URL: mysql://handbook:${DB_PASSWORD}@mysql:3306/handbook
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [app]
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:

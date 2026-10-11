@@ -1,0 +1,11 @@
+node_modules
+.nuxt
+.output
+.nuxt-test
+.output-test
+.mysql
+.data
+.git
+.env
+.env.*
+*.log

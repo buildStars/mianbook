@@ -11,6 +11,9 @@ node_modules
 .env.*
 !.env.example
 
+# 从服务器下载的数据库备份（npm run deploy:backup）
+backups/
+
 # 日志和系统文件
 *.log
 .DS_Store

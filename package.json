@@ -21,7 +21,9 @@
     "typecheck": "nuxt typecheck",
     "test": "vitest run --project unit",
     "test:api": "vitest run --project api",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:backup": "node scripts/deploy.mjs backup"
   },
   "dependencies": {
     "@element-plus/nuxt": "1.1.5",

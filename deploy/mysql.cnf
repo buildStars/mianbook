@@ -1,0 +1,10 @@
+# 服务器只有 4G 内存，和应用、Caddy 一起跑，MySQL 用小一点的配置
+[mysqld]
+innodb_buffer_pool_size = 256M
+performance_schema = OFF
+max_connections = 60
+skip-name-resolve
+character-set-server = utf8mb4
+collation-server = utf8mb4_0900_ai_ci
+# 和本地开发一样按 UTC 存时间，应用里的连接池也按 UTC 解析
+default-time-zone = '+00:00'

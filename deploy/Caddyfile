@@ -1,0 +1,18 @@
+# Caddy 会自动向 Let's Encrypt 申请证书并续期，需要域名已经解析到这台服务器
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000 {
+		# AI 面试、AI 写题是 SSE 流式输出，收到一段就转发一段
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
