@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   try {
     const [created] = await useDb().insert(tables.categories).values(body).$returningId()
     invalidateContent()
-    return { id: created!.id }
+    return { id: created!.id, sync: await writeOutlineFile() }
   } catch (error) {
     if (isDuplicateError(error)) throw createError({ statusCode: 409, message: '这个部分下已经有相同 slug 的分类' })
     throw error

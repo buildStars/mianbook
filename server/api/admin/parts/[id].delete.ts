@@ -8,5 +8,5 @@ export default defineEventHandler(async (event) => {
   if (row?.total) throw createError({ statusCode: 400, message: '请先删除或移走这个部分下的分类' })
   await db.delete(tables.parts).where(eq(tables.parts.id, id))
   invalidateContent()
-  return { ok: true }
+  return { ok: true, sync: await writeOutlineFile() }
 })

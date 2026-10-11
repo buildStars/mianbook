@@ -31,7 +31,9 @@ export default defineEventHandler(async (event) => {
       })
       .$returningId()
     invalidateContent()
-    return { id: created!.id }
+    // 写回 content/ 下的 Markdown，保持文件和数据库一致
+    const sync = await writeQuestionFile(created!.id)
+    return { id: created!.id, sync }
   } catch (error) {
     if (isDuplicateError(error)) throw createError({ statusCode: 409, message: '这个分类下已经有相同 slug 的题目' })
     throw error

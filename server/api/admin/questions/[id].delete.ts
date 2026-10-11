@@ -4,8 +4,10 @@ import { eq } from 'drizzle-orm'
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
   const id = idParam(event)
+  const previous = await questionFileLocation(id)
   const [result] = await useDb().delete(tables.questions).where(eq(tables.questions.id, id))
   if (!result.affectedRows) throw createError({ statusCode: 404, message: '题目不存在' })
   invalidateContent()
-  return { ok: true }
+  const sync = await removeQuestionFile(previous)
+  return { ok: true, sync }
 })

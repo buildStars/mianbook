@@ -9,6 +9,7 @@ export default defineEventHandler(async (event) => {
   const [category] = await db.select().from(tables.categories).where(eq(tables.categories.id, body.categoryId))
   if (!category) throw createError({ statusCode: 400, message: '分类不存在' })
 
+  const previous = await questionFileLocation(id)
   const rendered = await renderMarkdown(body.contentMd)
   try {
     const [result] = await db
@@ -26,5 +27,6 @@ export default defineEventHandler(async (event) => {
     throw error
   }
   invalidateContent()
-  return { id }
+  const sync = await writeQuestionFile(id, previous)
+  return { id, sync }
 })

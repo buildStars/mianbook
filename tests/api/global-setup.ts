@@ -9,6 +9,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import net from 'node:net'
+import os from 'node:os'
 import path from 'node:path'
 import type { TestProject } from 'vitest/node'
 import { startMockLlm, MOCK_KEY } from '../fixtures/mock-llm'
@@ -26,6 +27,7 @@ declare module 'vitest' {
     mockUrl: string
     dbUrl: string
     dailyLimit: number
+    contentDir: string
   }
 }
 
@@ -83,7 +85,11 @@ export default async function setup(project: TestProject) {
     run('nuxt/bin/nuxt.mjs', ['build'], { ...process.env, HANDBOOK_TEST_BUILD: '1' })
   }
 
-  // 3. 启动模拟大模型和服务
+  // 3. 后台改题会写回 content 目录：测试用一份临时拷贝，绝不能写到项目里的 content/
+  const contentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'handbook-content-'))
+  fs.cpSync(path.join(root, 'content'), contentDir, { recursive: true })
+
+  // 4. 启动模拟大模型和服务
   const llm = await startMockLlm()
   const port = await freePort()
   const server: ChildProcess = spawn(process.execPath, [entry], {
@@ -100,6 +106,7 @@ export default async function setup(project: TestProject) {
       NUXT_AI_MODEL: 'mock-model',
       NUXT_AI_DAILY_LIMIT: String(DAILY_LIMIT),
       NUXT_AI_EXTRA_HOSTS: '',
+      NUXT_CONTENT_DIR: contentDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -124,9 +131,13 @@ export default async function setup(project: TestProject) {
   project.provide('mockUrl', llm.url)
   project.provide('dbUrl', TEST_DB_URL)
   project.provide('dailyLimit', DAILY_LIMIT)
+  project.provide('contentDir', contentDir)
 
   return async () => {
     server.kill()
     await llm.close()
+    // 服务端日志留着排查失败的测试
+    fs.writeFileSync(path.join(root, '.output-test', 'server.log'), logs)
+    fs.rmSync(contentDir, { recursive: true, force: true })
   }
 }

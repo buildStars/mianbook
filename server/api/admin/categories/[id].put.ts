@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
   await requireAdmin(event)
   const id = idParam(event)
   const body = await readValidated(event, schema)
+  const before = await categoryFolder(id)
   try {
     await useDb().update(tables.categories).set(body).where(eq(tables.categories.id, id))
   } catch (error) {
@@ -19,5 +20,8 @@ export default defineEventHandler(async (event) => {
     throw error
   }
   invalidateContent()
-  return { id }
+  // 改了 slug 或换了所属部分时，把分类的文件夹挪过去
+  const after = await categoryFolder(id)
+  const moves = before && after && before !== after ? [{ from: before, to: after }] : []
+  return { id, sync: await writeOutlineFile(moves) }
 })

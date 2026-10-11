@@ -1,15 +1,16 @@
-// 数据库脚本：tsx scripts/db.ts <migrate|import|export|rerender> [目录]
+// 数据库脚本：tsx scripts/db.ts <migrate|import|export|rerender> [目录] [--force]
 //   migrate        执行 server/db/migrations 下的迁移
-//   import [dir]   把 Markdown 题目导入数据库（默认读 content/，没有则读 docs/），按 slug 覆盖更新
+//   import [dir]   把 Markdown 题目导入数据库（默认读 content/，没有则读 docs/），按 slug 更新；
+//                  数据库里的版本比文件新且内容不同时（比如在后台改过但没写回文件）跳过并提示，加 --force 强制覆盖
 //   export [dir]   把数据库里的题目导出为 Markdown（默认写到 content/），用于备份和版本管理
 //   rerender       修改了 Markdown 渲染规则后，用库里的 Markdown 重新生成所有题目的 HTML
 import fs from 'node:fs'
 import path from 'node:path'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/mysql2/migrator'
-import { parse as parseYaml } from 'yaml'
 import { createDb, tables } from '../server/utils/db'
 import { renderMarkdown } from '../server/utils/markdown'
+import { byFileName, defaultSort, parseQuestionFile, serializeQuestionFile } from '../server/utils/content-file'
 
 const root = path.resolve(import.meta.dirname, '..')
 try {
@@ -31,30 +32,10 @@ interface OutlineEntry {
   categories: { slug: string; title: string }[]
 }
 
-const byName = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true })
-
 function contentDir(arg?: string) {
   if (arg) return path.resolve(root, arg)
   const preferred = path.join(root, 'content')
   return fs.existsSync(preferred) ? preferred : path.join(root, 'docs')
-}
-
-/** 拆出 frontmatter、一级标题和正文 */
-function parseQuestion(src: string, file: string) {
-  const fm = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
-  const data = (fm ? parseYaml(fm[1]!) : null) ?? {}
-  const body = fm ? src.slice(fm[0].length) : src
-  const h1 = body.match(/^#\s+(.+)$/m)
-  if (!h1) throw new Error(`${file} 缺少一级标题`)
-  const content = body.slice(h1.index! + h1[0].length).trim()
-  return {
-    title: h1[1]!.trim(),
-    difficulty: Math.min(3, Math.max(1, Number(data.difficulty) || 2)),
-    tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
-    status: data.status === 'draft' ? ('draft' as const) : ('published' as const),
-    sort: typeof data.sort === 'number' ? data.sort : undefined,
-    content: `${content}\n`,
-  }
 }
 
 async function runMigrate() {
@@ -62,9 +43,11 @@ async function runMigrate() {
   console.log('迁移完成')
 }
 
-async function runImport(dir: string) {
+async function runImport(dir: string, force: boolean) {
   const outline: OutlineEntry[] = JSON.parse(fs.readFileSync(path.join(dir, 'outline.json'), 'utf-8'))
   let imported = 0
+  let unchanged = 0
+  const conflicts: string[] = []
 
   for (const [partIndex, part] of outline.entries()) {
     await db
@@ -85,10 +68,35 @@ async function runImport(dir: string) {
 
       const folder = path.join(dir, part.slug, cat.slug)
       if (!fs.existsSync(folder)) continue
-      const files = fs.readdirSync(folder).filter((f) => f.endsWith('.md')).sort(byName)
+      const files = fs.readdirSync(folder).filter((f) => f.endsWith('.md')).sort(byFileName)
 
       for (const [index, file] of files.entries()) {
-        const q = parseQuestion(fs.readFileSync(path.join(folder, file), 'utf-8'), file)
+        const filePath = path.join(folder, file)
+        const q = parseQuestionFile(fs.readFileSync(filePath, 'utf-8'), file)
+        const slug = file.replace(/\.md$/, '')
+        const sort = q.sort ?? defaultSort(index)
+        const [existing] = await db
+          .select()
+          .from(tables.questions)
+          .where(and(eq(tables.questions.categoryId, catRow!.id), eq(tables.questions.slug, slug)))
+        if (existing) {
+          const same =
+            existing.title === q.title &&
+            existing.contentMd.trim() === q.content.trim() &&
+            existing.difficulty === q.difficulty &&
+            existing.status === q.status &&
+            existing.sort === sort &&
+            JSON.stringify(existing.tags) === JSON.stringify(q.tags)
+          if (same) {
+            unchanged++
+            continue
+          }
+          // 数据库比文件新：多半是在后台改过但文件没同步，直接覆盖会丢掉后台的修改
+          if (!force && existing.updatedAt.getTime() > fs.statSync(filePath).mtimeMs + 2000) {
+            conflicts.push(path.relative(root, filePath))
+            continue
+          }
+        }
         const rendered = await renderMarkdown(q.content)
         const values = {
           title: q.title,
@@ -98,18 +106,24 @@ async function runImport(dir: string) {
           contentHtml: rendered.html,
           contentText: rendered.text,
           toc: rendered.toc,
-          sort: q.sort ?? (index + 1) * 10,
+          sort,
           status: q.status,
         }
         await db
           .insert(tables.questions)
-          .values({ categoryId: catRow!.id, slug: file.replace(/\.md$/, ''), ...values })
+          .values({ categoryId: catRow!.id, slug, ...values })
           .onDuplicateKeyUpdate({ set: values })
         imported++
       }
     }
   }
-  console.log(`导入完成：${imported} 道题（来源：${path.relative(root, dir) || '.'}）`)
+  console.log(`导入完成：更新 ${imported} 道，${unchanged} 道没有变化（来源：${path.relative(root, dir) || '.'}）`)
+  if (conflicts.length) {
+    console.warn(`\n有 ${conflicts.length} 道题数据库里的版本比文件新，已跳过，没有覆盖：`)
+    for (const f of conflicts) console.warn(`  - ${f}`)
+    console.warn('先用 npm run db:export 把数据库导出到文件、确认差异；确定要用文件覆盖时加 --force')
+    process.exitCode = 2
+  }
 }
 
 async function runExport(dir: string) {
@@ -134,16 +148,18 @@ async function runExport(dir: string) {
       if (!rows.length) continue
       const folder = path.join(dir, part.slug, cat.slug)
       fs.mkdirSync(folder, { recursive: true })
+      const ordered = rows.map((q) => `${q.slug}.md`).sort(byFileName)
       for (const q of rows) {
-        const front = [
-          '---',
-          `difficulty: ${q.difficulty}`,
-          `tags: [${q.tags.join(', ')}]`,
-          `sort: ${q.sort}`,
-          ...(q.status === 'draft' ? ['status: draft'] : []),
-          '---',
-        ].join('\n')
-        fs.writeFileSync(path.join(folder, `${q.slug}.md`), `${front}\n\n# ${q.title}\n\n${q.contentMd.trim()}\n`)
+        const index = ordered.indexOf(`${q.slug}.md`)
+        const text = serializeQuestionFile({
+          title: q.title,
+          difficulty: q.difficulty,
+          tags: q.tags,
+          status: q.status,
+          sort: q.sort === defaultSort(index) ? undefined : q.sort,
+          content: q.contentMd,
+        })
+        fs.writeFileSync(path.join(folder, `${q.slug}.md`), text)
         exported++
       }
     }
@@ -166,14 +182,16 @@ async function runRerender() {
   console.log(`重新渲染完成：${rows.length} 道题`)
 }
 
-const [command, dirArg] = process.argv.slice(2)
+const args = process.argv.slice(2)
+const force = args.includes('--force')
+const [command, dirArg] = args.filter((a) => !a.startsWith('--'))
 try {
   if (command === 'migrate') await runMigrate()
-  else if (command === 'import') await runImport(contentDir(dirArg))
+  else if (command === 'import') await runImport(contentDir(dirArg), force)
   else if (command === 'export') await runExport(dirArg ? path.resolve(root, dirArg) : path.join(root, 'content'))
   else if (command === 'rerender') await runRerender()
   else {
-    console.log('用法：tsx scripts/db.ts <migrate|import|export|rerender> [目录]')
+    console.log('用法：tsx scripts/db.ts <migrate|import|export|rerender> [目录] [--force]')
     process.exitCode = 1
   }
 } finally {

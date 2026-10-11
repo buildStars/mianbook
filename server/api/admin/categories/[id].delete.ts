@@ -8,5 +8,5 @@ export default defineEventHandler(async (event) => {
   if (row?.total) throw createError({ statusCode: 400, message: '这个分类下还有题目，请先删除或移动题目' })
   await db.delete(tables.categories).where(eq(tables.categories.id, id))
   invalidateContent()
-  return { ok: true }
+  return { ok: true, sync: await writeOutlineFile() }
 })

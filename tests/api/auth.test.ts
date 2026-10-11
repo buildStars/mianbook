@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { Client, db } from './helpers'
 
 describe('账号和权限', () => {
-  it('第一个注册的账号是管理员，之后的都是普通用户', async () => {
-    await new Client().register('a')
-    await new Client().register('b')
-    const [rows] = await db().query<any[]>('SELECT role FROM users ORDER BY id')
-    expect(rows[0].role).toBe('admin')
-    expect(rows.slice(1).every((r) => r.role === 'user')).toBe(true)
+  it('第一个注册的账号是管理员，之后注册的都是普通用户', async () => {
+    await new Client().register('seed') // 保证库里已经有用户：测试顺序不固定
+    const a = await new Client().register('a')
+    const b = await new Client().register('b')
+    const [[first]] = await db().query<any[]>('SELECT role FROM users ORDER BY id LIMIT 1')
+    expect(first.role).toBe('admin')
+    // 别的测试会把自己的用户提升为管理员，所以这里只看刚注册的两个
+    expect([a.role, b.role]).toEqual(['user', 'user'])
   })
 
   it('同一个邮箱不能重复注册', async () => {

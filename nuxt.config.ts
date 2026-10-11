@@ -47,6 +47,8 @@ export default defineNuxtConfig({
   // 环境变量会覆盖这里的默认值，例如 NUXT_AI_API_KEY → ai.apiKey，见 .env.example
   runtimeConfig: {
     databaseUrl: '',
+    // 后台修改题目时写回的 content 目录，默认是启动目录下的 content/；部署环境没有这个目录时只改数据库
+    contentDir: '',
     ai: {
       baseUrl: 'https://api.moonshot.cn/v1',
       apiKey: '',
