@@ -4,6 +4,7 @@
  * - Authorization 必须是 Bearer mock-key，否则返回 401
  * - 回答里写 [score=N] 时返回 N 分，否则 6 分；写 [upstream-error] 时返回 500
  * - 系统提示里有"面试总结"时返回总结，有"项目深挖题"且非流式时返回出题 JSON
+ * - 系统提示里有"写题目解析"时返回一篇用代码块包起来的题目正文（测试浏览器端的整理），有"规划选题"时返回选题列表
  * - 流式输出故意切成小块，并把一条 data 拆在两次写入里，测试服务端的拼接
  */
 import http from 'node:http'
@@ -37,6 +38,40 @@ function feedback(user: string): string {
 }
 
 const REPORT = '### 总体评价\n基础尚可，原理不够深入。\n### 做得好的地方\n- 第 1 题思路清楚\n### 主要问题\n- 取舍讲得不清楚\n### 复习建议\n- 复习相关原理'
+
+/** 后台 AI 写题：故意用代码块包起来并带一级标题，和真实模型偶尔的输出一样 */
+const AUTHORED = [
+  '```markdown',
+  '# 模拟的题目',
+  '',
+  '::: tip 一句话回答',
+  '这是 **AI 写的** 一句话回答。',
+  ':::',
+  '',
+  '## 详细解析',
+  '',
+  '### 原理',
+  '',
+  '正文内容。',
+  '',
+  '## 面试官可能追问',
+  '',
+  '::: details 追问一？',
+  '答案一。',
+  ':::',
+  '',
+  '## 易错点',
+  '',
+  '- 易错点一',
+  '```',
+].join('\n')
+
+const TOPICS = [
+  '2|`Promise.all` 和 `Promise.allSettled` 有什么区别？|高频的对比题',
+  '1|说说浏览器的事件循环（Event Loop）|和已有题目重复，应该被过滤',
+  '这一行格式不对',
+  '3|如何设计一个前端监控 SDK？|综合考察工程能力',
+].join('\n')
 
 const RESUME = {
   questions: [
@@ -86,13 +121,17 @@ export async function startMockLlm(): Promise<MockLlm> {
       return
     }
     if (body.stream === false) {
-      const content = system.includes('项目深挖题') ? `好的：\n\`\`\`json\n${JSON.stringify(RESUME)}\n\`\`\`` : '好'
+      const content = system.includes('项目深挖题')
+        ? `好的：\n\`\`\`json\n${JSON.stringify(RESUME)}\n\`\`\``
+        : system.includes('规划选题')
+          ? TOPICS
+          : '好'
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 20 } }))
       return
     }
 
-    const text = system.includes('面试总结') ? REPORT : feedback(user)
+    const text = system.includes('面试总结') ? REPORT : system.includes('写题目解析') ? AUTHORED : feedback(user)
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
     for (const piece of text.match(/[\s\S]{1,12}/g) ?? []) {
       if (res.destroyed) return

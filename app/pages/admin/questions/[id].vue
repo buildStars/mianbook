@@ -50,8 +50,9 @@ const { structure } = useAdminStructure()
 const form = reactive<QuestionForm>({
   categoryId: route.query.categoryId ? Number(route.query.categoryId) : undefined,
   slug: '',
-  title: '',
-  difficulty: 2,
+  // 从 AI 选题建议点"用这个"跳过来时带着题目和难度
+  title: typeof route.query.title === 'string' ? route.query.title.slice(0, 255) : '',
+  difficulty: [1, 2, 3].includes(Number(route.query.difficulty)) ? Number(route.query.difficulty) : 2,
   tags: [],
   contentMd: TEMPLATE,
   sort: undefined,
@@ -219,8 +220,28 @@ const lint = computed(() => {
 const editor = ref<{ goToLine: (line: number) => void }>()
 
 // ---------- 侧栏 ----------
-type Panel = 'props' | 'lint' | 'history'
-const panel = ref<Panel>(['lint', 'history'].includes(String(route.query.panel)) && !isNew.value ? (route.query.panel as Panel) : 'props')
+type Panel = 'props' | 'lint' | 'history' | 'ai'
+const initialPanel = String(route.query.panel)
+const panel = ref<Panel>(
+  initialPanel === 'lint' || initialPanel === 'ai' || (initialPanel === 'history' && !isNew.value) ? (initialPanel as Panel) : 'props',
+)
+
+// ---------- AI 写题 ----------
+const pristine = computed(() => !form.contentMd.trim() || form.contentMd === TEMPLATE)
+const lintIssues = computed(() =>
+  [...lint.value.problems, ...lint.value.warnings].map((i) => (i.line ? `第 ${i.line} 行：${i.message}` : i.message)),
+)
+const categoryTitle = computed(() => categories.value.find((c) => c.id === form.categoryId)?.title ?? '')
+
+function pickTopic(t: { title: string; difficulty: number }) {
+  if (isNew.value) {
+    form.title = t.title
+    form.difficulty = t.difficulty
+    ElMessage.success('已填入题目，可以接着让 AI 起草正文')
+  } else {
+    navigateTo({ path: '/admin/questions/new', query: { categoryId: form.categoryId, title: t.title, difficulty: t.difficulty, panel: 'ai' } })
+  }
+}
 
 function restoreVersion(v: QuestionVersionDetail) {
   Object.assign(form, { title: v.title, difficulty: v.difficulty, tags: [...v.tags], status: v.status, contentMd: v.contentMd })
@@ -282,6 +303,7 @@ function restoreVersion(v: QuestionVersionDetail) {
             <span v-else class="badge ok" aria-label="没有问题"><AdminIcon name="check" :size="12" /></span>
           </button>
           <button type="button" role="tab" :aria-selected="panel === 'history'" :disabled="isNew" @click="panel = 'history'">历史</button>
+          <button type="button" role="tab" :aria-selected="panel === 'ai'" @click="panel = 'ai'"><AdminIcon name="sparkle" :size="14" />AI</button>
         </div>
 
         <!-- 属性 -->
@@ -345,6 +367,22 @@ function restoreVersion(v: QuestionVersionDetail) {
               </ul>
             </div>
           </template>
+        </div>
+
+        <!-- AI 写题 -->
+        <div v-show="panel === 'ai'" class="pane" role="tabpanel">
+          <AdminAiAssistant
+            v-model:content="form.contentMd"
+            :is-new="isNew"
+            :question-id="isNew ? null : questionId"
+            :category-id="form.categoryId"
+            :category-title="categoryTitle"
+            :title="form.title"
+            :difficulty="form.difficulty"
+            :pristine="pristine"
+            :issues="lintIssues"
+            @pick-topic="pickTopic"
+          />
         </div>
 
         <!-- 修改历史 -->

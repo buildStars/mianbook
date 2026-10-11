@@ -119,7 +119,7 @@ const REPORT_PROMPT = `你是一名资深技术面试官，刚刚对候选人做
 只依据提供的数据，不要编造候选人没答过的内容。`
 
 /** 从一轮点评里取出"遗漏或不准确"那一节，截断后用于生成总结 */
-function missingPart(feedback: string): string {
+export function missingPart(feedback: string): string {
   const section = feedback.split(/^#{1,4}\s*遗漏或不准确\s*$/m)[1]?.split(/^#{1,4}\s/m)[0] ?? ''
   return section.trim().slice(0, 400)
 }

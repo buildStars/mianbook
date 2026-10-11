@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { diffHunks, diffLines, diffStats } from '#shared/utils/line-diff'
+import { diffHunks, diffLines, diffStats, withInlineChanges } from '#shared/utils/line-diff'
 
 /** 两段 Markdown 的逐行对比：只显示改动附近的几行，其余折叠 */
 const props = defineProps<{ oldText: string; newText: string }>()
 
-const lines = computed(() => diffLines(props.oldText, props.newText))
+const lines = computed(() => withInlineChanges(diffLines(props.oldText, props.newText)))
 const hunks = computed(() => diffHunks(lines.value))
 const stats = computed(() => diffStats(lines.value))
 const trailing = computed(() => {
@@ -28,7 +28,8 @@ const trailing = computed(() => {
           <span class="no">{{ l.oldNo ?? '' }}</span>
           <span class="no">{{ l.newNo ?? '' }}</span>
           <span class="sign" aria-hidden="true">{{ l.type === 'add' ? '+' : l.type === 'del' ? '−' : '' }}</span>
-          <span class="text">{{ l.text || ' ' }}</span>
+          <span v-if="l.segments" class="text"><template v-for="(seg, n) in l.segments" :key="n"><mark v-if="seg.changed">{{ seg.text }}</mark><template v-else>{{ seg.text }}</template></template></span>
+          <span v-else class="text">{{ l.text || ' ' }}</span>
         </div>
       </template>
       <div v-if="trailing > 0" class="skip">⋯ {{ trailing }} 行没有改动</div>
@@ -67,7 +68,6 @@ const trailing = computed(() => {
 .line {
   display: grid;
   grid-template-columns: 40px 40px 18px minmax(0, 1fr);
-  min-width: max-content;
 }
 
 .no {
@@ -84,9 +84,26 @@ const trailing = computed(() => {
   user-select: none;
 }
 
+/* 中文一段话通常是一整行，自动换行，不用横向滚动 */
 .text {
   padding-right: 16px;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.text mark {
+  border-radius: 2px;
+  color: inherit;
+}
+
+.line.add mark {
+  background: color-mix(in srgb, var(--st-mastered) 30%, transparent);
+}
+
+.line.del mark {
+  background: color-mix(in srgb, var(--st-weak) 26%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--c-danger) 50%, transparent);
 }
 
 .line.add {

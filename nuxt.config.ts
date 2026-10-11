@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+
 // 站点标志：印章红底白字"面"
 const favicon =
   "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23c8372d'/><text x='32' y='45' font-size='36' font-weight='700' font-family='serif' text-anchor='middle' fill='white'>面</text></svg>"
@@ -7,7 +9,13 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
 
   // 接口测试单独构建到 .nuxt-test / .output-test，避免覆盖正在运行的开发服务器
-  ...(process.env.HANDBOOK_TEST_BUILD ? { buildDir: '.nuxt-test', nitro: { output: { dir: '.output-test' } } } : {}),
+  ...(process.env.HANDBOOK_TEST_BUILD ? { buildDir: '.nuxt-test' } : {}),
+
+  nitro: {
+    ...(process.env.HANDBOOK_TEST_BUILD ? { output: { dir: '.output-test' } } : {}),
+    // 写作规范打包进服务端，后台 AI 写题时作为提示词的一部分
+    serverAssets: [{ baseName: 'templates', dir: fileURLToPath(new URL('./templates', import.meta.url)) }],
+  },
 
   modules: ['@nuxtjs/color-mode', '@element-plus/nuxt', 'nuxt-auth-utils'],
 

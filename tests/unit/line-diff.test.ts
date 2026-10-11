@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diffHunks, diffLines, diffStats } from '#shared/utils/line-diff'
+import { diffHunks, diffLines, diffStats, withInlineChanges } from '#shared/utils/line-diff'
 
 describe('diffLines 按行对比', () => {
   it('内容一样时全部是相同行', () => {
@@ -61,5 +61,32 @@ describe('diffHunks 折叠没改动的行', () => {
     // 第一块到第 4 行（'3'）为止，第二块从 '24' 开始，中间 '4'～'23' 共 20 行折叠
     expect(hunks[1]!.skipped).toBe(20)
     expect(hunks[1]!.lines[0]!.text).toBe('24')
+  })
+})
+
+describe('withInlineChanges 行内改动', () => {
+  it('配对的删除和新增行标出改动的字', () => {
+    const lines = withInlineChanges(diffLines('闭包是函数和词法环境的组合。\n下一行', '闭包是函数和它定义时所在词法环境的组合。\n下一行'))
+    // 纯插入：旧行里没有改动的部分，只剩前后两段
+    expect(lines[0]!.segments).toEqual([
+      { text: '闭包是函数和', changed: false },
+      { text: '词法环境的组合。', changed: false },
+    ])
+    expect(lines[1]!.segments).toEqual([
+      { text: '闭包是函数和', changed: false },
+      { text: '它定义时所在', changed: true },
+      { text: '词法环境的组合。', changed: false },
+    ])
+    expect(lines[2]!.segments).toBeUndefined()
+  })
+
+  it('整行都不一样时不标', () => {
+    const lines = withInlineChanges(diffLines('abc', 'xyz'))
+    expect(lines.every((l) => !l.segments)).toBe(true)
+  })
+
+  it('emoji 不会被拆开', () => {
+    const lines = withInlineChanges(diffLines('写法 ✅ 正确', '写法 ❌ 正确'))
+    expect(lines[1]!.segments!.find((s) => s.changed)!.text).toBe('❌')
   })
 })

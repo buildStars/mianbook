@@ -1,6 +1,6 @@
 /** 管理后台用到的接口类型 */
 
-export type AiKind = 'interview' | 'report' | 'resume'
+export type AiKind = 'interview' | 'report' | 'resume' | 'author'
 
 export interface DashboardQuestionRef {
   id: number

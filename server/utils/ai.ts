@@ -1,4 +1,4 @@
-import { and, count, eq, gte, notLike } from 'drizzle-orm'
+import { and, count, eq, gte, ne, notLike } from 'drizzle-orm'
 import { createError, getHeader, type H3Event } from 'h3'
 import { AI_HEADERS, AI_PROVIDERS } from '#shared/utils/ai-providers'
 
@@ -106,13 +106,20 @@ export function parseUserTarget(
   return { source: 'user', baseUrl: `${url.origin}${url.pathname}`.replace(/\/+$/, ''), apiKey, model }
 }
 
-/** 最近 24 小时内用站点 Key 的调用次数（滚动窗口，不受时区影响）；用户自己的 Key 记为 xxx-own，不计入 */
+/** 最近 24 小时内用站点 Key 的调用次数（滚动窗口，不受时区影响）；用户自己的 Key 记为 xxx-own，管理员在后台写题记为 author，都不计入 */
 export async function aiUsageToday(userId: number): Promise<number> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const [row] = await useDb()
     .select({ total: count() })
     .from(tables.aiCalls)
-    .where(and(eq(tables.aiCalls.userId, userId), notLike(tables.aiCalls.kind, '%-own'), gte(tables.aiCalls.createdAt, since)))
+    .where(
+      and(
+        eq(tables.aiCalls.userId, userId),
+        notLike(tables.aiCalls.kind, '%-own'),
+        ne(tables.aiCalls.kind, 'author'),
+        gte(tables.aiCalls.createdAt, since),
+      ),
+    )
   return row?.total ?? 0
 }
 
@@ -159,12 +166,14 @@ export async function* streamChat(
   target: AiTarget,
   messages: ChatMessage[],
   signal: AbortSignal,
+  /** 后台写整道题时输出长，需要更多 token 和更长的超时 */
+  options: { maxTokens?: number; timeoutMs?: number } = {},
 ): AsyncGenerator<{ delta?: string; usage?: ChatUsage }> {
   const res = await fetch(`${target.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
-    body: JSON.stringify({ model: target.model, messages, stream: true, max_tokens: 2048 }),
-    signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
+    body: JSON.stringify({ model: target.model, messages, stream: true, max_tokens: options.maxTokens ?? 2048 }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(options.timeoutMs ?? 120_000)]),
     redirect: 'error',
   })
   if (!res.ok || !res.body) throw await toAiError(res, target)
@@ -242,7 +251,7 @@ export async function resolveAi(event: H3Event, userId: number) {
 }
 
 /** 记一次大模型调用；用自己 Key 的记成 xxx-own，不占站点的每日次数 */
-export function recordAiCall(userId: number, kind: 'interview' | 'report' | 'resume', ownKey: boolean, usage?: ChatUsage) {
+export function recordAiCall(userId: number, kind: 'interview' | 'report' | 'resume' | 'author', ownKey: boolean, usage?: ChatUsage) {
   return useDb()
     .insert(tables.aiCalls)
     .values({

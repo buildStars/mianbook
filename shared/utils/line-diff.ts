@@ -84,22 +84,22 @@ export function diffStats(lines: DiffLine[]): { added: number; removed: number }
   return { added, removed }
 }
 
-export interface DiffHunk {
-  lines: DiffLine[]
+export interface DiffHunk<T extends DiffLine = DiffLine> {
+  lines: T[]
   /** 这一块前面省略了多少行没有改动的内容 */
   skipped: number
 }
 
 /** 只保留改动附近的几行上下文，其余没有改动的行折叠起来 */
-export function diffHunks(lines: DiffLine[], context = 3): DiffHunk[] {
+export function diffHunks<T extends DiffLine>(lines: T[], context = 3): DiffHunk<T>[] {
   const keep = new Uint8Array(lines.length)
   lines.forEach((l, i) => {
     if (l.type === 'same') return
     for (let k = Math.max(0, i - context); k <= Math.min(lines.length - 1, i + context); k++) keep[k] = 1
   })
-  const hunks: DiffHunk[] = []
+  const hunks: DiffHunk<T>[] = []
   let skipped = 0
-  let current: DiffHunk | null = null
+  let current: DiffHunk<T> | null = null
   lines.forEach((l, i) => {
     if (!keep[i]) {
       skipped++
@@ -114,4 +114,61 @@ export function diffHunks(lines: DiffLine[], context = 3): DiffHunk[] {
     current.lines.push(l)
   })
   return hunks
+}
+
+export interface InlineSegment {
+  text: string
+  /** 这一段是行内改动的部分 */
+  changed: boolean
+}
+
+/**
+ * 行内改动：连续删除的几行紧跟着连续新增的几行时，按顺序两两配对，
+ * 去掉共同的开头和结尾，中间就是改动的部分。中文的一段话通常是一整行，这样能看出具体改了哪几个字
+ */
+export function withInlineChanges(lines: DiffLine[]): (DiffLine & { segments?: InlineSegment[] })[] {
+  const out: (DiffLine & { segments?: InlineSegment[] })[] = lines.map((l) => ({ ...l }))
+  let i = 0
+  while (i < out.length) {
+    if (out[i]!.type !== 'del') {
+      i++
+      continue
+    }
+    const delStart = i
+    while (i < out.length && out[i]!.type === 'del') i++
+    const addStart = i
+    while (i < out.length && out[i]!.type === 'add') i++
+    const pairs = Math.min(addStart - delStart, i - addStart)
+    for (let k = 0; k < pairs; k++) {
+      const [a, b] = inlinePair(out[delStart + k]!.text, out[addStart + k]!.text)
+      if (a && b) {
+        out[delStart + k]!.segments = a
+        out[addStart + k]!.segments = b
+      }
+    }
+  }
+  return out
+}
+
+function inlinePair(oldText: string, newText: string): [InlineSegment[], InlineSegment[]] | [null, null] {
+  // 按字符（而不是 UTF-16 码元）比较，避免把 emoji 之类的字拆成两半
+  const a = Array.from(oldText)
+  const b = Array.from(newText)
+  let start = 0
+  while (start < a.length && start < b.length && a[start] === b[start]) start++
+  let endA = a.length
+  let endB = b.length
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+    endA--
+    endB--
+  }
+  // 几乎整行都不一样时，标出来反而更乱
+  if (start + (a.length - endA) < 2) return [null, null]
+  const split = (chars: string[], end: number): InlineSegment[] =>
+    [
+      { text: chars.slice(0, start).join(''), changed: false },
+      { text: chars.slice(start, end).join(''), changed: true },
+      { text: chars.slice(end).join(''), changed: false },
+    ].filter((s) => s.text)
+  return [split(a, endA), split(b, endB)]
 }
