@@ -17,8 +17,10 @@
       { "slug": "mysql", "title": "MySQL" },
       { "slug": "redis", "title": "Redis" },
       { "slug": "distributed", "title": "分布式与消息队列" },
+      { "slug": "backend-design", "title": "后端系统设计" },
       { "slug": "os", "title": "操作系统与 Linux" },
       { "slug": "container", "title": "Docker 与 K8s" },
+      { "slug": "algorithm", "title": "算法与数据结构" },
       { "slug": "design-pattern", "title": "设计模式" }
     ]
   },

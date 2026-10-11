@@ -34,7 +34,7 @@ tags: [高频, 实践, 场景题]
 1. `top` 后按 `P` 按 CPU 排序，找到进程 PID；多核机器上按 `1` 看每个核，确认是单核打满还是整体打满
 2. `top -H -p <pid>` 看这个进程里哪个线程最忙，记下线程 ID
 3. 按语言定位代码：
-   - **Java**：`printf '%x\n' <tid>` 把线程 ID 转成十六进制，`jstack <pid> | grep -A 30 'nid=0x<十六进制>'` 看这个线程的堆栈；GC 线程忙就转去看 GC 日志
+   - **Java**：用 `jstack <pid>` 按线程 ID 找到这个线程的堆栈。JDK 18 起 nid 直接是十进制；JDK 17 及以前要先 `printf '%x\n' <tid>` 转成十六进制，再搜 `nid=0x...`。GC 线程忙就转去看 GC 日志
    - **Go**：线程和 goroutine 不是一一对应的，直接用 pprof 采样：`go tool pprof http://<host>:<port>/debug/pprof/profile?seconds=30`（服务要引入 `net/http/pprof`）
    - **Node.js**：主线程打满时用 `--cpu-prof` 或 inspector 采集 CPU profile，见 [Node.js 服务 CPU 飙高怎么排查](/basics/node/13-cpu-profiling)
    - 通用：`perf top -p <pid>` 看热点函数，对 C/C++ 和内核态问题尤其有用
@@ -75,7 +75,8 @@ Java 进程 CPU 高时的完整流程：
 
 ```bash
 top -H -p 1234                 # 找到最忙的线程，假设 TID 是 1250
-printf '%x\n' 1250             # 输出 4e2
+jstack 1234 | grep -A 30 'nid=1250 '   # JDK 18 起 nid 是十进制
+printf '%x\n' 1250                      # JDK 17 及以前先转十六进制，输出 4e2
 jstack 1234 | grep -A 30 'nid=0x4e2'
 
 # 连续抓几次堆栈，间隔几秒对比，持续出现在同一位置的才是热点
@@ -100,5 +101,5 @@ for i in 1 2 3; do jstack 1234 > /tmp/jstack.$i.txt; sleep 5; done
 
 - 看到 free 很小就以为内存不够，应该看 available
 - load average 高不等于 CPU 忙，Linux 的 load 包含了等待磁盘 I/O 的 D 状态任务
-- `top -H` 里显示的是十进制线程 ID，jstack 里的 nid 是十六进制，要先转换
+- `top -H` 里显示的是十进制线程 ID；JDK 17 及以前 jstack 里的 nid 是十六进制，要先转换，JDK 18 起 nid 直接打印成十进制，不用再转
 - 只排查到进程就停下，没有落到具体的代码或请求，问题还会复发；处理时先保留现场（堆栈、profile、日志），再重启恢复
