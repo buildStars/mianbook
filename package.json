@@ -1,0 +1,44 @@
+{
+  "name": "interview-handbook",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "setup": "node scripts/mysql.mjs init && tsx scripts/db.ts migrate && tsx scripts/db.ts import",
+    "db:init": "node scripts/mysql.mjs init",
+    "db:start": "node scripts/mysql.mjs start",
+    "db:stop": "node scripts/mysql.mjs stop",
+    "db:status": "node scripts/mysql.mjs status",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/db.ts migrate",
+    "db:import": "tsx scripts/db.ts import",
+    "db:export": "tsx scripts/db.ts export",
+    "db:rerender": "tsx scripts/db.ts rerender",
+    "content:check": "node scripts/check-content.mjs"
+  },
+  "dependencies": {
+    "@element-plus/nuxt": "1.1.5",
+    "@fontsource-variable/noto-serif-sc": "5.3.0",
+    "@nuxtjs/color-mode": "4.0.1",
+    "@shikijs/markdown-it": "4.5.0",
+    "drizzle-orm": "0.45.4",
+    "element-plus": "2.14.7",
+    "markdown-it": "15.0.2",
+    "markdown-it-cjk-friendly": "3.0.0",
+    "markdown-it-container": "4.0.0",
+    "minisearch": "7.2.0",
+    "mysql2": "3.24.5",
+    "nuxt": "4.6.1",
+    "nuxt-auth-utils": "0.5.31",
+    "shiki": "4.5.0",
+    "yaml": "2.9.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15"
+  }
+}

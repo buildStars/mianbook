@@ -1,0 +1,609 @@
+/* ==========================================================================
+   题目正文（服务端渲染的 Markdown，结构见 server/utils/markdown.ts）
+   - .custom-block.answer                 一句话回答
+   - section.doc-section[data-kind]       analysis 详细解析 / code 代码示例 / followups 追问 / pitfalls 易错点
+   - .code-block > .code-head + pre       代码块，固定深色
+   ========================================================================== */
+.doc-content {
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--c-text-1);
+  overflow-wrap: break-word;
+  counter-reset: sec;
+}
+
+.doc-content > :first-child {
+  margin-top: 0;
+}
+
+/* 段落、列表 */
+.doc-content p,
+.doc-content ul,
+.doc-content ol {
+  margin: 14px 0;
+}
+
+.doc-content ul,
+.doc-content ol {
+  padding-left: 1.4em;
+}
+
+.doc-content li + li {
+  margin-top: 6px;
+}
+
+.doc-content li > ul,
+.doc-content li > ol {
+  margin: 6px 0 0;
+}
+
+.doc-content ul > li::marker {
+  color: var(--c-brand);
+}
+
+.doc-content ol > li::marker {
+  color: var(--c-brand);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 重点词：像在书上用荧光笔划过 */
+.doc-content strong {
+  font-weight: 650;
+  background: linear-gradient(transparent 62%, color-mix(in srgb, var(--c-brand) 16%, transparent) 0);
+}
+
+.doc-content a {
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--c-brand) 40%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur);
+}
+
+.doc-content a:hover {
+  text-decoration-color: currentColor;
+}
+
+.doc-content img {
+  max-width: 100%;
+  border-radius: var(--r-md);
+}
+
+.doc-content hr {
+  margin: 32px 0;
+  border: none;
+  border-top: 1px solid var(--c-divider);
+}
+
+/* 标题：二级标题是"章节"，带编号 01 02 …… */
+.doc-content h2,
+.doc-content h3,
+.doc-content h4 {
+  position: relative;
+  outline: none;
+}
+
+.doc-section {
+  margin-top: 56px;
+}
+
+.doc-content h2 {
+  counter-increment: sec;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 56px 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--c-divider);
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.doc-section > h2:first-child {
+  margin-top: 0;
+}
+
+.doc-content h2::before {
+  content: counter(sec, decimal-leading-zero);
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--c-brand);
+  transform: translateY(-4px);
+}
+
+.doc-content h3 {
+  margin: 32px 0 6px;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.doc-content h4 {
+  margin: 24px 0 4px;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.doc-content .header-anchor {
+  margin-left: 6px;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  color: var(--c-text-3);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--dur);
+}
+
+.doc-content h2:hover .header-anchor,
+.doc-content h3:hover .header-anchor,
+.doc-content .header-anchor:focus {
+  opacity: 1;
+}
+
+/* 行内代码 */
+.doc-content :not(pre) > code {
+  padding: 0.15em 0.45em;
+  border-radius: 5px;
+  background: var(--code-inline-bg);
+  color: var(--c-text-1);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
+.doc-content a > code {
+  color: inherit;
+}
+
+/* 引用 */
+.doc-content blockquote {
+  margin: 20px 0;
+  padding: 12px 18px;
+  border-left: 3px solid var(--c-border);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  background: var(--c-bg-soft);
+  color: var(--c-text-2);
+  font-size: 15px;
+}
+
+.doc-content blockquote > p {
+  margin: 0;
+}
+
+/* 表格：只保留横线，第一列加粗当作行标题 */
+.doc-content .table-wrap {
+  margin: 20px 0;
+  overflow-x: auto;
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-elv);
+}
+
+.doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.doc-content th,
+.doc-content td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--c-divider);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-content th {
+  background: var(--c-bg-soft);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+
+.doc-content tr:last-child td {
+  border-bottom: none;
+}
+
+.doc-content td:first-child {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   一句话回答
+   ========================================================================== */
+.doc-content .custom-block.answer {
+  position: relative;
+  margin: 0;
+  padding: 22px 26px 22px 30px;
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-elv);
+  box-shadow: var(--shadow-sm);
+  font-size: 16px;
+  line-height: 1.9;
+  overflow: hidden;
+}
+
+.doc-content .custom-block.answer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--c-brand);
+}
+
+.doc-content .custom-block.answer::after {
+  content: '“';
+  position: absolute;
+  top: -22px;
+  right: 18px;
+  font-family: var(--font-serif);
+  font-size: 128px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--c-brand-soft);
+  pointer-events: none;
+}
+
+.doc-content .custom-block.answer .custom-block-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--c-brand);
+}
+
+.doc-content .custom-block.answer .custom-block-title::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2 3 14h9l-1 8 10-12h-9l1-8z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.doc-content .custom-block.answer p {
+  position: relative;
+  margin: 0;
+}
+
+/* ==========================================================================
+   其他提示块
+   ========================================================================== */
+.doc-content .custom-block {
+  margin: 20px 0;
+  padding: 14px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.doc-content .custom-block p {
+  margin: 6px 0;
+}
+
+.doc-content .custom-block .custom-block-title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.doc-content .custom-block .code-block {
+  margin: 10px 0;
+}
+
+.doc-content .custom-block.tip:not(.answer) {
+  border-color: color-mix(in srgb, var(--c-brand) 16%, transparent);
+  background: var(--c-brand-softer);
+}
+
+.doc-content .custom-block.info {
+  border-color: var(--c-divider);
+  background: var(--c-bg-soft);
+}
+
+.doc-content .custom-block.warning {
+  border-color: color-mix(in srgb, var(--st-fuzzy) 30%, transparent);
+  background: var(--c-warning-soft);
+}
+
+.doc-content .custom-block.warning .custom-block-title {
+  color: var(--c-warning);
+}
+
+.doc-content .custom-block.danger {
+  border-color: color-mix(in srgb, var(--st-weak) 25%, transparent);
+  background: var(--c-danger-soft);
+}
+
+.doc-content .custom-block.danger .custom-block-title {
+  color: var(--c-danger);
+}
+
+/* ==========================================================================
+   代码块：顶栏（窗口圆点 + 语言 + 复制），深浅模式都用深色底
+   ========================================================================== */
+.doc-content .code-block {
+  margin: 20px 0;
+  border: 1px solid var(--code-border);
+  border-radius: var(--r-lg);
+  background: var(--code-bg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.doc-content .code-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 40px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--code-border);
+  background: var(--code-head);
+}
+
+.doc-content .code-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.doc-content .code-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5f57;
+  opacity: 0.85;
+}
+
+.doc-content .code-dots i:nth-child(2) {
+  background: #febc2e;
+}
+
+.doc-content .code-dots i:nth-child(3) {
+  background: #28c840;
+}
+
+.doc-content .code-lang {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--code-muted);
+}
+
+.doc-content .code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--code-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    color var(--dur),
+    background-color var(--dur),
+    border-color var(--dur);
+}
+
+.doc-content .code-copy::before {
+  content: '';
+  width: 13px;
+  height: 13px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2'/%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.doc-content .code-copy:hover {
+  border-color: var(--code-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--code-text);
+}
+
+.doc-content .code-copy.copied {
+  color: #3dcf8e;
+}
+
+.doc-content .code-copy.copied::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+}
+
+.doc-content .code-block pre.shiki {
+  margin: 0;
+  padding: 18px 20px;
+  overflow-x: auto;
+  background-color: transparent !important;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  tab-size: 2;
+}
+
+.doc-content .code-block code {
+  font-family: inherit;
+}
+
+/* Shiki 同时输出浅色和深色两套颜色，这里固定用深色 */
+.doc-content .shiki,
+.doc-content .shiki span {
+  color: var(--shiki-dark) !important;
+}
+
+/* ==========================================================================
+   面试官可能追问：Q1、Q2 …… 折叠卡片
+   ========================================================================== */
+.doc-section[data-kind='followups'] {
+  counter-reset: fq;
+}
+
+.doc-content details.details {
+  margin: 12px 0;
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-elv);
+  transition:
+    border-color var(--dur),
+    box-shadow var(--dur);
+}
+
+.doc-content details.details:hover {
+  border-color: var(--c-border);
+}
+
+.doc-content details.details[open] {
+  box-shadow: var(--shadow-sm);
+}
+
+.doc-section[data-kind='followups'] details.details {
+  counter-increment: fq;
+}
+
+.doc-content details.details > summary {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px 48px 15px 18px;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.65;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.doc-content details.details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.doc-section[data-kind='followups'] details.details > summary::before {
+  content: 'Q' counter(fq);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 22px;
+  margin-top: 2px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+  background: var(--c-brand-soft);
+  color: var(--c-brand);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.doc-content details.details > summary::after {
+  content: '';
+  position: absolute;
+  top: 19px;
+  right: 18px;
+  width: 16px;
+  height: 16px;
+  background: var(--c-text-3);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform var(--dur) var(--ease);
+}
+
+.doc-content details.details[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.doc-content details.details > :not(summary) {
+  margin-right: 18px;
+  margin-left: 18px;
+}
+
+.doc-section[data-kind='followups'] details.details > :not(summary) {
+  margin-left: 60px;
+}
+
+.doc-content details.details > summary + * {
+  margin-top: 0;
+}
+
+.doc-content details.details > :last-child {
+  margin-bottom: 16px;
+}
+
+.doc-content details.details p {
+  color: var(--c-text-2);
+}
+
+/* ==========================================================================
+   易错点：红色感叹号清单
+   ========================================================================== */
+.doc-section[data-kind='pitfalls'] > ul {
+  margin: 0;
+  padding: 6px 0;
+  border: 1px solid color-mix(in srgb, var(--st-weak) 20%, var(--c-divider));
+  border-radius: var(--r-lg);
+  background: var(--c-danger-soft);
+  list-style: none;
+}
+
+.doc-section[data-kind='pitfalls'] > ul > li {
+  position: relative;
+  margin: 0;
+  padding: 10px 20px 10px 52px;
+}
+
+.doc-section[data-kind='pitfalls'] > ul > li + li {
+  border-top: 1px dashed color-mix(in srgb, var(--st-weak) 22%, transparent);
+}
+
+.doc-section[data-kind='pitfalls'] > ul > li::before {
+  content: '!';
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--st-weak);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .doc-content h2 {
+    font-size: 22px;
+  }
+
+  .doc-content .custom-block.answer {
+    padding: 18px 18px 18px 22px;
+  }
+
+  .doc-section[data-kind='followups'] details.details > :not(summary) {
+    margin-left: 18px;
+  }
+
+  .doc-content .code-block {
+    margin-right: -4px;
+    margin-left: -4px;
+  }
+}

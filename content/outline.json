@@ -1,0 +1,47 @@
+[
+  {
+    "slug": "basics",
+    "title": "全栈基础",
+    "categories": [
+      { "slug": "javascript", "title": "JavaScript" },
+      { "slug": "typescript", "title": "TypeScript" },
+      { "slug": "css", "title": "CSS" },
+      { "slug": "browser", "title": "浏览器" },
+      { "slug": "network", "title": "计算机网络" },
+      { "slug": "vue", "title": "Vue" },
+      { "slug": "react", "title": "React" },
+      { "slug": "build", "title": "前端工程化" },
+      { "slug": "node", "title": "Node.js" },
+      { "slug": "go", "title": "Go" },
+      { "slug": "java", "title": "Java" },
+      { "slug": "mysql", "title": "MySQL" },
+      { "slug": "redis", "title": "Redis" },
+      { "slug": "distributed", "title": "分布式与消息队列" },
+      { "slug": "os", "title": "操作系统与 Linux" },
+      { "slug": "container", "title": "Docker 与 K8s" },
+      { "slug": "design-pattern", "title": "设计模式" }
+    ]
+  },
+  {
+    "slug": "ai",
+    "title": "LLM 与 Agent",
+    "categories": [
+      { "slug": "llm", "title": "LLM 基础" },
+      { "slug": "prompt", "title": "Prompt 与上下文工程" },
+      { "slug": "tools", "title": "Tool Calling 与 MCP" },
+      { "slug": "rag", "title": "RAG" },
+      { "slug": "agent", "title": "Agent" }
+    ]
+  },
+  {
+    "slug": "engineering",
+    "title": "AI 工程化",
+    "categories": [
+      { "slug": "streaming", "title": "流式输出" },
+      { "slug": "eval", "title": "评测与可观测" },
+      { "slug": "deploy", "title": "部署与成本" },
+      { "slug": "security", "title": "安全" },
+      { "slug": "system-design", "title": "系统设计" }
+    ]
+  }
+]

@@ -1,0 +1,18 @@
+node_modules
+.nuxt
+.output
+.data
+.mysql
+
+# 本地环境变量里有数据库密码、会话密钥和 AI Key，不能提交
+.env
+.env.*
+!.env.example
+
+# 日志和系统文件
+*.log
+.DS_Store
+Thumbs.db
+
+# Claude Code 的个人设置
+.claude/settings.local.json
