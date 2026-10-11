@@ -210,7 +210,7 @@ export async function resolveAi(event: H3Event, userId: number) {
 }
 
 /** 记一次大模型调用；用自己 Key 的记成 xxx-own，不占站点的每日次数 */
-export function recordAiCall(userId: number, kind: 'interview' | 'report', ownKey: boolean, usage?: ChatUsage) {
+export function recordAiCall(userId: number, kind: 'interview' | 'report' | 'resume', ownKey: boolean, usage?: ChatUsage) {
   return useDb()
     .insert(tables.aiCalls)
     .values({
@@ -220,4 +220,22 @@ export function recordAiCall(userId: number, kind: 'interview' | 'report', ownKe
       completionTokens: usage?.completion_tokens ?? null,
     })
     .catch(() => {})
+}
+
+/** 非流式调用一次，返回完整文本；用于出题这类不需要边生成边显示的场景 */
+export async function chatOnce(
+  target: AiTarget,
+  messages: ChatMessage[],
+  options: { maxTokens?: number; timeoutMs?: number } = {},
+): Promise<{ text: string; usage?: ChatUsage }> {
+  const res = await fetch(`${target.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
+    body: JSON.stringify({ model: target.model, messages, stream: false, max_tokens: options.maxTokens ?? 2048 }),
+    signal: AbortSignal.timeout(options.timeoutMs ?? 120_000),
+    redirect: 'error',
+  })
+  if (!res.ok) throw await toAiError(res, target)
+  const body = await res.json()
+  return { text: String(body?.choices?.[0]?.message?.content ?? ''), usage: body?.usage }
 }

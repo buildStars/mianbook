@@ -149,7 +149,9 @@ export interface ReviewSummary {
 export type MockDifficulty = 'basic' | 'advanced' | 'deep' | 'mixed'
 
 export interface MockConfig {
-  /** 方向，如 frontend、go-backend；自定义时为 custom */
+  /** bank 按方向从题库抽题；resume 按简历出项目深挖题，再搭配题库里的相关基础题 */
+  mode?: 'bank' | 'resume'
+  /** 方向，如 frontend、go-backend；自定义时为 custom；按简历出题时为 resume */
   track: string
   categoryIds: number[]
   difficulty: MockDifficulty
@@ -158,10 +160,23 @@ export interface MockConfig {
   followUps: number
   /** 优先抽不会、模糊和到期该复习的题 */
   preferWeak: boolean
+  /** 按简历出题时的目标岗位（简历原文不保存） */
+  role?: string
+}
+
+/** 按简历生成的项目深挖题，不在题库里 */
+export interface CustomQuestion {
+  title: string
+  /** 考察要点，评分时代替参考答案 */
+  points: string[]
 }
 
 export interface MockItem {
-  questionId: number
+  /** 题库里的题；按简历生成的题为 null，内容在 custom 里 */
+  questionId: number | null
+  custom?: CustomQuestion
+  /** 按简历生成的题不写 interviews 表，问答记录存在这里 */
+  turns?: InterviewTurn[]
   interviewId: number | null
   /** 每一轮的得分 */
   scores: (number | null)[]
@@ -193,6 +208,16 @@ export interface MockSessionSummary {
 export interface MockSessionDetail extends MockSessionSummary {
   config: MockConfig
   currentIndex: number
-  items: (MockItem & { question: MockQuestionInfo; turns: InterviewTurn[] })[]
+  items: (MockItem & { question: MockQuestionInfo; turns: InterviewTurn[]; points: string[] | null })[]
   report: string | null
+}
+
+/** 进度页薄弱点分析：某个分类的 AI 面试得分和到期复习数 */
+export interface CategoryInsight {
+  /** 每道题最近一次 AI 面试第一轮得分的平均值 */
+  avgScore: number | null
+  /** 面试过的题数 */
+  interviewed: number
+  /** 今天到期要复习的题数 */
+  due: number
 }

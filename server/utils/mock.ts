@@ -78,7 +78,7 @@ export async function pickQuestions(userId: number, config: MockConfig, focus: n
   ])
   const weak = new Set(records.filter((r) => r.status === 'weak' || r.status === 'fuzzy').map((r) => r.questionId))
   const due = new Set(dueRows.map((r) => r.questionId))
-  const recent = new Set(recentSessions.flatMap((s) => s.items.map((i) => i.questionId)))
+  const recent = new Set(recentSessions.flatMap((s) => s.items.map((i) => i.questionId).filter((id) => id !== null)))
 
   const weightOf = (q: OutlineQuestion) => {
     let w = 1
@@ -118,6 +118,7 @@ export async function pickQuestions(userId: number, config: MockConfig, focus: n
 }
 
 export function sessionTitle(config: MockConfig): string {
+  if (config.mode === 'resume') return `按简历出题 · ${config.role?.trim() || '项目深挖'} · ${config.count} 题`
   const track = MOCK_TRACKS.find((t) => t.id === config.track)?.name ?? '自选分类'
   const level = MOCK_DIFFICULTIES.find((d) => d.value === config.difficulty)?.label ?? ''
   return `${track} · ${level} · ${config.count} 题`
@@ -180,18 +181,30 @@ export async function sessionDetail(row: SessionRow): Promise<MockSessionDetail>
     config: row.config,
     currentIndex: row.currentIndex,
     report: row.report,
-    items: row.items.map((item) => ({
-      ...item,
-      question: info.get(item.questionId) ?? {
-        id: item.questionId,
-        num: 0,
-        title: '（题目已下线）',
-        path: '',
-        category: '',
-        difficulty: 0,
-      },
-      turns: item.interviewId ? (turnsById.get(item.interviewId) ?? []) : [],
-    })),
+    items: row.items.map((item) => {
+      // 按简历生成的题：没有题库链接，问答记录存在 item 自己身上
+      if (item.custom) {
+        return {
+          ...item,
+          question: { id: 0, num: 0, title: item.custom.title, path: '', category: '项目深挖', difficulty: 0 },
+          turns: item.turns ?? [],
+          points: item.custom.points,
+        }
+      }
+      return {
+        ...item,
+        question: info.get(item.questionId ?? 0) ?? {
+          id: item.questionId ?? 0,
+          num: 0,
+          title: '（题目已下线）',
+          path: '',
+          category: '',
+          difficulty: 0,
+        },
+        turns: item.interviewId ? (turnsById.get(item.interviewId) ?? []) : [],
+        points: null,
+      }
+    }),
   }
 }
 

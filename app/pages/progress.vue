@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OutlineQuestion, StudyStatus } from '#shared/types/handbook'
+import type { CategoryInsight, OutlineQuestion, StudyStatus } from '#shared/types/handbook'
 
 useHead({ title: '我的进度 | 全栈面试手册' })
 
@@ -7,6 +7,84 @@ const { outline, all } = useOutline()
 const { records, ready, importRecords, clearAll } = useStudy()
 const { loggedIn } = useUserSession()
 const { summary } = useReview()
+
+// ---- 薄弱点分析 ----
+const insights = ref<Record<number, CategoryInsight>>({})
+async function loadInsights() {
+  if (!loggedIn.value) {
+    insights.value = {}
+    return
+  }
+  insights.value = await $fetch<Record<number, CategoryInsight>>('/api/progress/insights', {
+    query: { tz: new Date().getTimezoneOffset() },
+  }).catch(() => ({}))
+}
+onMounted(loadInsights)
+watch(loggedIn, loadInsights)
+
+/**
+ * 每个分类的掌握情况。
+ * mastery：整个分类的掌握度（掌握算 1、模糊算 0.5，除以题数），体现覆盖面；
+ * strength：学过的题掌握得怎么样，有 AI 面试得分时和得分各占一半，用来找薄弱点
+ */
+const catStats = computed(() =>
+  outline.value.flatMap((p) =>
+    p.categories.map((c) => {
+      let mastered = 0
+      let fuzzy = 0
+      let weak = 0
+      for (const q of c.questions) {
+        const st = statusOf(q)
+        if (st === 'mastered') mastered++
+        else if (st === 'fuzzy') fuzzy++
+        else if (st === 'weak') weak++
+      }
+      const touched = mastered + fuzzy + weak
+      const ins = insights.value[c.id]
+      const avgScore = ins?.avgScore ?? null
+      const quality = touched ? ((mastered + fuzzy * 0.5) / touched) * 100 : null
+      const strength =
+        quality === null ? (avgScore === null ? null : avgScore * 10) : avgScore === null ? quality : (quality + avgScore * 10) / 2
+      return {
+        id: c.id,
+        partId: p.id,
+        title: c.title,
+        total: c.questions.length,
+        mastered,
+        fuzzy,
+        weak,
+        touched,
+        mastery: c.questions.length ? Math.round(((mastered + fuzzy * 0.5) / c.questions.length) * 100) : 0,
+        avgScore,
+        interviewed: ins?.interviewed ?? 0,
+        due: ins?.due ?? 0,
+        strength: strength === null ? null : Math.round(strength),
+      }
+    }),
+  ),
+)
+
+/** 至少学过两道或面试过的分类才参与排名，避免只点过一道题就被判成最弱 */
+const weakest = computed(() =>
+  catStats.value
+    .filter((c) => c.strength !== null && (c.touched >= 2 || c.interviewed > 0))
+    .sort((a, b) => a.strength! - b.strength! || b.weak - a.weak)
+    .slice(0, 5),
+)
+
+const radarPartId = ref<number | null>(null)
+const radarPart = computed(() => outline.value.find((p) => p.id === radarPartId.value) ?? outline.value[0])
+const radar = computed(() => {
+  const cats = catStats.value.filter((c) => c.partId === radarPart.value?.id)
+  const series: { name: string; tone: 'brand' | 'ai'; values: (number | null)[] }[] = [
+    { name: '掌握度', tone: 'brand', values: cats.map((c) => c.mastery) },
+  ]
+  if (cats.some((c) => c.avgScore !== null)) {
+    series.push({ name: 'AI 面试得分', tone: 'ai', values: cats.map((c) => (c.avgScore === null ? null : c.avgScore * 10)) })
+  }
+  return { axes: cats.map((c) => c.title), series }
+})
+const mockLink = (ids: number[]) => `/mock?categories=${ids.join(',')}`
 
 type Filter = 'review' | 'new' | 'star' | 'all'
 const filters: { value: Filter; label: string; empty: string }[] = [
@@ -193,6 +271,59 @@ async function onClear() {
           <span class="stat-label">笔记</span>
           <strong class="serif">{{ stats.note }}</strong>
           <p>用自己的话写下的复述</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 薄弱点分析 -->
+    <section class="insight">
+      <div class="section-head">
+        <h2 class="serif">薄弱点分析</h2>
+        <p>掌握度按"掌握算 1、模糊算 0.5"统计；AI 得分取每道题最近一次面试第一轮的分数</p>
+      </div>
+      <div class="insight-grid">
+        <div class="radar-card">
+          <div class="tabs radar-tabs" role="tablist" aria-label="选择部分">
+            <button
+              v-for="p in outline"
+              :key="p.id"
+              type="button"
+              role="tab"
+              :aria-selected="radarPart?.id === p.id"
+              :class="{ active: radarPart?.id === p.id }"
+              @click="radarPartId = p.id"
+            >
+              {{ p.title }}
+            </button>
+          </div>
+          <ProgressRadar v-if="radar.axes.length >= 3" :axes="radar.axes" :series="radar.series" />
+          <ul class="radar-legend">
+            <li><i class="brand" />掌握度</li>
+            <li v-if="radar.series.length > 1"><i class="ai" />AI 面试得分（×10）</li>
+          </ul>
+        </div>
+
+        <div class="weak-card">
+          <p class="weak-title">最需要加强</p>
+          <ol v-if="weakest.length" class="weak-list">
+            <li v-for="c in weakest" :key="c.id">
+              <div class="weak-row">
+                <span class="weak-name">{{ c.title }}</span>
+                <span class="weak-meter"><i :style="{ width: `${c.strength}%` }" :class="c.strength! >= 70 ? 'good' : c.strength! >= 45 ? 'ok' : 'bad'" /></span>
+                <b class="weak-num">{{ c.strength }}</b>
+              </div>
+              <p class="weak-detail">
+                学了 {{ c.touched }}/{{ c.total }} 题 · 不会 {{ c.weak }}、模糊 {{ c.fuzzy }}<template v-if="c.avgScore !== null"> · AI 均分 {{ c.avgScore }}（{{ c.interviewed }} 题）</template><template v-if="c.due"> · {{ c.due }} 道待复习</template>
+                <NuxtLink :to="mockLink([c.id])" class="weak-go">针对练一场</NuxtLink>
+              </p>
+            </li>
+          </ol>
+          <p v-else class="weak-empty">
+            先刷几道题、标记掌握程度<template v-if="loggedIn">，或者让 AI 考一考</template>，这里会列出最需要加强的分类。
+          </p>
+          <NuxtLink v-if="loggedIn && weakest.length >= 2" :to="mockLink(weakest.slice(0, 3).map((c) => c.id))" class="btn btn-ai btn-sm weak-cta">
+            针对最弱的 {{ Math.min(3, weakest.length) }} 个分类模拟面试
+          </NuxtLink>
         </div>
       </div>
     </section>
@@ -463,6 +594,145 @@ async function onClear() {
   margin: 6px 0 0;
   font-size: 14px;
   color: var(--c-text-2);
+}
+
+.insight {
+  margin-top: 56px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.radar-card,
+.weak-card {
+  padding: 20px 22px;
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-elv);
+}
+
+.radar-tabs {
+  margin-top: 0;
+}
+
+.radar-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--c-text-2);
+}
+
+.radar-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+.radar-legend i.brand {
+  background: var(--c-brand);
+}
+
+.radar-legend i.ai {
+  background: var(--ai-via);
+}
+
+.weak-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.weak-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weak-list li + li {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--c-divider);
+}
+
+.weak-row {
+  display: grid;
+  grid-template-columns: minmax(0, 120px) 1fr 30px;
+  align-items: center;
+  gap: 12px;
+}
+
+.weak-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weak-meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--c-bg-mute);
+}
+
+.weak-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.weak-meter i.good {
+  background: var(--st-mastered);
+}
+
+.weak-meter i.ok {
+  background: var(--st-fuzzy);
+}
+
+.weak-meter i.bad {
+  background: var(--st-weak);
+}
+
+.weak-num {
+  text-align: right;
+}
+
+.weak-detail {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--c-text-3);
+}
+
+.weak-go {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.weak-empty {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--c-text-2);
+}
+
+.weak-cta {
+  margin-top: 18px;
+}
+
+@media (max-width: 860px) {
+  .insight-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .map {

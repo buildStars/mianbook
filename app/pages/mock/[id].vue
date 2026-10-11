@@ -70,7 +70,7 @@ async function submit() {
   try {
     await postSSE(
       '/api/interviews/stream',
-      { questionId: it.questionId, sessionId: id, interviewId: it.interviewId ?? undefined, answer: text },
+      { questionId: it.questionId ?? undefined, sessionId: id, interviewId: it.interviewId ?? undefined, answer: text },
       { headers: headersFor(), signal: controller.signal },
       (event, data) => {
         if (event === 'delta') streamText.value += data.text
@@ -206,7 +206,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
       <ol class="steps" aria-label="题目进度">
         <li
           v-for="(it, i) in detail.items"
-          :key="it.questionId"
+          :key="i"
           :class="[level(it.done ? scoreOf(it) : null), { current: !finished && i === detail.currentIndex, done: it.done }]"
           :title="`第 ${i + 1} 题：${plainTitle(it.question.title)}${it.done ? ` · ${it.skipped ? '跳过' : `${scoreOf(it) ?? '—'} 分`}` : ''}`"
         >
@@ -219,7 +219,8 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
       <!-- 答题 -->
       <section v-if="!finished && item" class="stage card">
         <p class="q-meta">
-          第 {{ detail.currentIndex + 1 }} / {{ detail.items.length }} 题 · {{ item.question.category }} · {{ DIFFICULTY_LABELS[item.question.difficulty] }}
+          第 {{ detail.currentIndex + 1 }} / {{ detail.items.length }} 题 · {{ item.question.category
+          }}<template v-if="item.question.difficulty"> · {{ DIFFICULTY_LABELS[item.question.difficulty] }}</template>
         </p>
 
         <div class="chat">
@@ -261,6 +262,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
                 @keydown.meta.enter.prevent="submit"
               />
               <div class="actions">
+                <InterviewVoiceInput v-model="answer" :maxlength="3000" />
                 <span class="count"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交 · {{ answer.length }}/3000</span>
                 <button type="button" class="btn btn-sm btn-ghost" :disabled="busy" @click="skip">
                   {{ item.turns.length ? '跳过追问' : '不会，跳过' }}
@@ -328,7 +330,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
         <section class="items">
           <h2 class="serif">每道题</h2>
           <ol>
-            <li v-for="(it, i) in detail.items" :key="it.questionId" class="item-row">
+            <li v-for="(it, i) in detail.items" :key="i" class="item-row">
               <button type="button" class="item-head" :aria-expanded="showDetails === i" :disabled="!it.turns.length" @click="showDetails = showDetails === i ? null : i">
                 <span class="item-no">{{ i + 1 }}</span>
                 <span class="item-title"><RichTitle :title="it.question.title" /><small>{{ it.question.category }}</small></span>
@@ -344,7 +346,13 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
                   <p class="a">答：{{ turn.answer }}</p>
                   <InterviewFeedback :text="turn.feedback" :score="turn.score" />
                 </template>
-                <NuxtLink :to="it.question.path" class="item-link">看这道题的完整解析 →</NuxtLink>
+                <div v-if="it.points?.length" class="points">
+                  <p>这道题想考察：</p>
+                  <ul>
+                    <li v-for="pt in it.points" :key="pt">{{ pt }}</li>
+                  </ul>
+                </div>
+                <NuxtLink v-if="it.question.path" :to="it.question.path" class="item-link">看这道题的完整解析 →</NuxtLink>
               </div>
             </li>
           </ol>
@@ -353,8 +361,9 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
         <section v-if="toReview.length" class="to-review">
           <h2 class="serif">建议优先复习</h2>
           <ul>
-            <li v-for="it in toReview" :key="it.questionId">
-              <NuxtLink :to="it.question.path"><RichTitle :title="it.question.title" /></NuxtLink>
+            <li v-for="(it, i) in toReview" :key="i">
+              <NuxtLink v-if="it.question.path" :to="it.question.path"><RichTitle :title="it.question.title" /></NuxtLink>
+              <span v-else class="custom-title"><RichTitle :title="it.question.title" /></span>
               <span>{{ it.question.category }} · {{ it.skipped ? '跳过' : `${scoreOf(it)} 分` }}</span>
             </li>
           </ul>
@@ -855,6 +864,29 @@ section > h2,
   font-size: 13px;
 }
 
+.points {
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  background: var(--c-bg-soft);
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.points p {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.points ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.to-review li .custom-title {
+  font-size: inherit;
+  color: var(--c-text-1);
+}
+
 .to-review li {
   display: flex;
   flex-wrap: wrap;
@@ -865,7 +897,7 @@ section > h2,
   border-bottom: 1px dashed var(--c-divider);
 }
 
-.to-review li span {
+.to-review li > span:not(.custom-title) {
   font-size: 12.5px;
   color: var(--c-text-3);
 }

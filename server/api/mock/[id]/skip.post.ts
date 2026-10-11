@@ -9,7 +9,8 @@ export default defineEventHandler(async (event) => {
   // 已经答了几轮再跳过追问的，保留已有得分，不当作不会
   const answered = item.scores.length > 0
   const items = row.items.map((it, i) => (i === row.currentIndex ? { ...it, skipped: !answered, done: true } : it))
-  if (!answered) {
+  // 按简历生成的题不在题库里，不进复习计划
+  if (!answered && item.questionId !== null) {
     await reviewQuestion(user.id, item.questionId, 1, 'mock')
     const current = await getStudyRecord(user.id, item.questionId)
     await saveStudyRecord(user.id, item.questionId, { status: 'weak', starred: current?.starred ?? false, note: current?.note ?? null })

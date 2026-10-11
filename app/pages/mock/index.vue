@@ -12,7 +12,7 @@ interface AiStatus {
 
 const { loggedIn } = useUserSession()
 const { outline } = useOutline()
-const { hasKey, config: aiKey } = useAiKey()
+const { hasKey, config: aiKey, headersFor } = useAiKey()
 const { data: ai } = useFetch<AiStatus>('/api/ai/status', { key: 'ai-status' })
 const showSettings = ref(false)
 
@@ -24,6 +24,18 @@ const form = reactive({
   followUps: 1,
   preferWeak: true,
 })
+// 从进度页"针对练一场"过来时带着分类 id，直接切到自选分类
+const route = useRoute()
+const presetIds = String(route.query.categories ?? '')
+  .split(',')
+  .map(Number)
+  .filter((n) => Number.isInteger(n) && n > 0)
+if (presetIds.length) {
+  form.track = 'custom'
+  form.categoryIds = presetIds
+  form.preferWeak = true
+}
+
 const FOLLOW_UPS = [
   { value: 0, label: '不追问' },
   { value: 1, label: '追问 1 次' },
@@ -42,8 +54,17 @@ onMounted(loadHistory)
 watch(loggedIn, loadHistory)
 
 const canUse = computed(() => hasKey.value || Boolean(ai.value?.enabled))
-/** 每题 1 轮加追问次数，结束后再生成 1 次总结 */
-const estimate = computed(() => form.count * (1 + form.followUps) + 1)
+/** 出题方式：按方向从题库抽，或者按简历出项目深挖题 */
+const mode = ref<'bank' | 'resume'>('bank')
+const resumeForm = reactive({ resume: '', role: '', projectCount: 4, bankCount: 3, followUps: 1 })
+
+/** 每题 1 轮加追问次数，结束后再生成 1 次总结；按简历出题还要多 1 次出题 */
+const estimate = computed(() =>
+  mode.value === 'bank'
+    ? form.count * (1 + form.followUps) + 1
+    : (resumeForm.projectCount + resumeForm.bankCount) * (1 + resumeForm.followUps) + 2,
+)
+const perQuestion = computed(() => 1 + (mode.value === 'bank' ? form.followUps : resumeForm.followUps))
 const custom = computed(() => form.track === 'custom')
 
 function toggleCategory(id: number) {
@@ -67,6 +88,31 @@ async function start() {
     await navigateTo(`/mock/${id}`)
   } catch (error: any) {
     errorMsg.value = error?.data?.message ?? '创建失败，请稍后再试'
+  } finally {
+    starting.value = false
+  }
+}
+
+async function startResume() {
+  if (starting.value) return
+  if (resumeForm.resume.trim().length < 50) {
+    errorMsg.value = '简历或项目描述至少写 50 个字'
+    return
+  }
+  starting.value = true
+  errorMsg.value = ''
+  try {
+    // 出题要调用大模型，带上用户自己的 Key（如果填了）
+    const { id } = await $fetch<{ id: number }>('/api/mock/resume', {
+      method: 'POST',
+      body: { ...resumeForm },
+      headers: headersFor(),
+      timeout: 150_000,
+    })
+    resumeForm.resume = ''
+    await navigateTo(`/mock/${id}`)
+  } catch (error: any) {
+    errorMsg.value = error?.data?.message ?? '出题失败，请稍后再试'
   } finally {
     starting.value = false
   }
@@ -107,6 +153,12 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
       </NuxtLink>
 
       <section class="setup card">
+        <div class="segmented mode" role="tablist" aria-label="出题方式">
+          <button type="button" role="tab" :aria-checked="mode === 'bank'" :aria-selected="mode === 'bank'" @click="mode = 'bank'">按方向出题</button>
+          <button type="button" role="tab" :aria-checked="mode === 'resume'" :aria-selected="mode === 'resume'" @click="mode = 'resume'">按简历出题</button>
+        </div>
+
+        <template v-if="mode === 'bank'">
         <div class="field">
           <p class="label">面试方向</p>
           <div class="tracks" role="radiogroup" aria-label="面试方向">
@@ -193,20 +245,70 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
         <button type="button" role="switch" class="switch" :aria-checked="form.preferWeak" @click="form.preferWeak = !form.preferWeak">
           <span class="switch-track" />优先抽不会、模糊和今天该复习的题
         </button>
+        </template>
+
+        <template v-else>
+          <div class="field">
+            <p class="label">简历或项目经历</p>
+            <textarea
+              v-model="resumeForm.resume"
+              class="resume-input"
+              rows="10"
+              maxlength="8000"
+              placeholder="粘贴简历里的项目经历部分即可：做过什么项目、负责哪块、用了哪些技术、解决了什么问题、取得了什么结果……"
+            />
+            <p class="hint">
+              {{ resumeForm.resume.length }}/8000 · 简历只用于这一次出题，不会保存到服务器，但会发给 AI 服务商处理。建议先删掉姓名、电话、邮箱、公司名等个人信息。
+            </p>
+          </div>
+          <div class="row">
+            <div class="field grow">
+              <p class="label">目标岗位 <span class="muted">（可选）</span></p>
+              <input v-model="resumeForm.role" class="text-input" maxlength="60" placeholder="例如：高级前端工程师、Go 后端" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <p class="label">项目深挖题</p>
+              <div class="segmented" role="radiogroup" aria-label="项目深挖题数量">
+                <button v-for="n in [3, 4, 6]" :key="n" type="button" role="radio" :aria-checked="resumeForm.projectCount === n" @click="resumeForm.projectCount = n">{{ n }} 道</button>
+              </div>
+            </div>
+            <div class="field">
+              <p class="label">相关基础题</p>
+              <div class="segmented" role="radiogroup" aria-label="相关基础题数量">
+                <button v-for="n in [0, 3, 5]" :key="n" type="button" role="radio" :aria-checked="resumeForm.bankCount === n" @click="resumeForm.bankCount = n">{{ n ? `${n} 道` : '不要' }}</button>
+              </div>
+            </div>
+            <div class="field">
+              <p class="label">每题追问</p>
+              <div class="segmented" role="radiogroup" aria-label="每题追问">
+                <button v-for="f in FOLLOW_UPS" :key="f.value" type="button" role="radio" :aria-checked="resumeForm.followUps === f.value" @click="resumeForm.followUps = f.value">{{ f.label }}</button>
+              </div>
+            </div>
+          </div>
+          <p class="hint">AI 先读简历，针对你的项目出题（先介绍项目，再深挖方案、难点和取舍）；同时识别简历里的技术栈，从题库对应分类补几道基础题。</p>
+        </template>
 
         <InterviewAiSettings v-if="showSettings" class="settings" :extra-hosts="ai?.extraHosts ?? []" @close="showSettings = false" @saved="showSettings = false" />
 
         <div class="start">
           <p class="cost">
-            预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ 1 + form.followUps }} 次，加 1 次总结）。
+            预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ perQuestion }} 次，加 1 次总结<template v-if="mode === 'resume'">和 1 次出题</template>）。
             <template v-if="hasKey">使用你自己的 Key（{{ aiKey?.model }}），不限次数。</template>
             <template v-else-if="ai?.enabled">今天还剩 {{ ai.remaining }} 次，不够时可以中途停下，下次接着答。</template>
             <template v-else>站点没有配置 AI 服务，需要填写你自己的 API Key。</template>
             <button type="button" class="link-btn" @click="showSettings = !showSettings">{{ hasKey ? 'AI 设置' : '用自己的 Key' }}</button>
           </p>
-          <button type="button" class="btn btn-ai btn-lg" :disabled="starting || !canUse" @click="start">
+          <button
+            type="button"
+            class="btn btn-ai btn-lg"
+            :disabled="starting || !canUse"
+            @click="mode === 'bank' ? start() : startResume()"
+          >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" /></svg>
-            {{ starting ? '正在抽题…' : '开始面试' }}
+            <template v-if="mode === 'bank'">{{ starting ? '正在抽题…' : '开始面试' }}</template>
+            <template v-else>{{ starting ? 'AI 正在读简历、出题…' : 'AI 出题并开始' }}</template>
           </button>
         </div>
         <p v-if="errorMsg" class="error" role="alert">{{ errorMsg }}</p>
@@ -421,6 +523,48 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
 
 .switch {
   align-self: flex-start;
+}
+
+.mode {
+  align-self: flex-start;
+}
+
+.resume-input,
+.text-input {
+  width: 100%;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+  color: var(--c-text-1);
+  font: inherit;
+}
+
+.resume-input {
+  padding: 14px 16px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.text-input {
+  height: 38px;
+  padding: 0 12px;
+}
+
+.resume-input:focus-visible,
+.text-input:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: -1px;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--c-text-3);
+}
+
+.grow {
+  flex: 1 1 320px;
 }
 
 .settings {

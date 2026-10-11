@@ -1,10 +1,11 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import type { InterviewTurn, MockItem } from '#shared/types/handbook'
+import type { CustomQuestion, InterviewTurn, MockItem } from '#shared/types/handbook'
 import type { ChatUsage } from '../../utils/ai'
 
 const schema = z.object({
-  questionId: z.number().int().positive(),
+  /** 题库里的题；整场面试里按简历生成的题不传 */
+  questionId: z.number().int().positive().optional(),
   interviewId: z.number().int().positive().optional(),
   /** 整场模拟面试的 id；单题面试不传 */
   sessionId: z.number().int().positive().optional(),
@@ -23,25 +24,37 @@ export default defineEventHandler(async (event) => {
   // 整场模拟面试：只能回答当前这道题，轮数按设置的追问次数决定
   const session = body.sessionId ? await getMockSession(user.id, body.sessionId) : null
   let maxRounds = MAX_ROUNDS
+  let custom: CustomQuestion | undefined
   if (session) {
     const item = session.items[session.currentIndex]
     if (session.status !== 'active') throw createError({ statusCode: 400, message: '这场面试已经结束' })
-    if (!item || item.questionId !== body.questionId) throw createError({ statusCode: 400, message: '请回答当前这道题' })
+    if (!item) throw createError({ statusCode: 400, message: '请回答当前这道题' })
     if (item.done) throw createError({ statusCode: 400, message: '这道题已经答完了，请进入下一题' })
-    if ((item.interviewId ?? undefined) !== body.interviewId) throw createError({ statusCode: 400, message: '面试记录不匹配，请刷新页面' })
+    if (item.custom) {
+      custom = item.custom
+    } else {
+      if (item.questionId !== body.questionId) throw createError({ statusCode: 400, message: '请回答当前这道题' })
+      if ((item.interviewId ?? undefined) !== body.interviewId) throw createError({ statusCode: 400, message: '面试记录不匹配，请刷新页面' })
+    }
     maxRounds = 1 + session.config.followUps
+  } else if (!body.questionId) {
+    throw createError({ statusCode: 400, message: '缺少题目' })
   }
 
   const { target, ownKey, remaining } = await resolveAi(event, user.id)
 
-  const [question] = await db
-    .select({ id: tables.questions.id, title: tables.questions.title, contentMd: tables.questions.contentMd })
-    .from(tables.questions)
-    .where(and(eq(tables.questions.id, body.questionId), eq(tables.questions.status, 'published')))
-  if (!question) throw createError({ statusCode: 404, message: '题目不存在' })
+  // 题目：题库里的题读参考答案；按简历生成的题用考察要点代替参考答案
+  let question: { id: number; title: string; contentMd: string } | undefined
+  if (!custom) {
+    ;[question] = await db
+      .select({ id: tables.questions.id, title: tables.questions.title, contentMd: tables.questions.contentMd })
+      .from(tables.questions)
+      .where(and(eq(tables.questions.id, body.questionId!), eq(tables.questions.status, 'published')))
+    if (!question) throw createError({ statusCode: 404, message: '题目不存在' })
+  }
 
   let interview: typeof tables.interviews.$inferSelect | undefined
-  if (body.interviewId) {
+  if (!custom && body.interviewId) {
     ;[interview] = await db
       .select()
       .from(tables.interviews)
@@ -49,7 +62,7 @@ export default defineEventHandler(async (event) => {
         and(
           eq(tables.interviews.id, body.interviewId),
           eq(tables.interviews.userId, user.id),
-          eq(tables.interviews.questionId, question.id),
+          eq(tables.interviews.questionId, question!.id),
         ),
       )
     if (!interview) throw createError({ statusCode: 404, message: '面试记录不存在' })
@@ -58,15 +71,17 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const turns = interview?.turns ?? []
+  const turns = custom ? (session!.items[session!.currentIndex]!.turns ?? []) : (interview?.turns ?? [])
+  if (custom && turns.length && !turns.at(-1)?.followUp) throw createError({ statusCode: 400, message: '这道题已经答完了' })
   const round = turns.length + 1
   const lastRound = round >= maxRounds
   const messages = buildInterviewMessages({
-    title: question.title.replace(/`/g, ''),
-    reference: question.contentMd,
+    title: (custom?.title ?? question!.title).replace(/`/g, ''),
+    reference: custom ? custom.points.map((p) => `- ${p}`).join('\n') : question!.contentMd,
     turns,
     answer: body.answer,
     maxRounds,
+    kind: custom ? 'project' : 'bank',
   })
 
   const stream = createEventStream(event)
@@ -92,6 +107,17 @@ export default defineEventHandler(async (event) => {
       const { score, followUp } = parseFeedback(text, lastRound)
       const turn: InterviewTurn = { answer: body.answer, feedback: text, score, followUp, at: new Date().toISOString() }
       const nextTurns = [...turns, turn]
+      const finished = !followUp
+
+      // 按简历生成的题：记录只存在这场面试里，不进复习计划
+      if (custom) {
+        const items: MockItem[] = session!.items.map((it, i) =>
+          i === session!.currentIndex ? { ...it, turns: nextTurns, scores: [...it.scores, score], done: finished } : it,
+        )
+        await saveItems(session!.id, items)
+        await send('done', { interviewId: null, round, score, followUp, finished, studyStatus: null, remaining })
+        return
+      }
 
       let interviewId = interview?.id
       if (interviewId) {
@@ -102,22 +128,22 @@ export default defineEventHandler(async (event) => {
       } else {
         const [created] = await db
           .insert(tables.interviews)
-          .values({ userId: user.id, questionId: question.id, turns: nextTurns, rounds: 1, score, sessionId: session?.id ?? null })
+          .values({ userId: user.id, questionId: question!.id, turns: nextTurns, rounds: 1, score, sessionId: session?.id ?? null })
           .$returningId()
         interviewId = created!.id
       }
 
       // 第一轮的得分反映"会不会这道题"，计入复习计划；追问考的是深度，不计入
       if (round === 1 && score !== null) {
-        await reviewQuestion(user.id, question.id, gradeFromScore(score), session ? 'mock' : 'interview')
+        await reviewQuestion(user.id, question!.id, gradeFromScore(score), session ? 'mock' : 'interview')
       }
 
       // 低分的题自动标记为"不会"或"模糊"，方便之后复习
       let studyStatus = null
       const suggested = statusFromScore(score)
       if (suggested) {
-        const current = await getStudyRecord(user.id, question.id)
-        const saved = await saveStudyRecord(user.id, question.id, {
+        const current = await getStudyRecord(user.id, question!.id)
+        const saved = await saveStudyRecord(user.id, question!.id, {
           status: suggested,
           starred: current?.starred ?? false,
           note: current?.note ?? null,
@@ -125,7 +151,6 @@ export default defineEventHandler(async (event) => {
         studyStatus = saved?.status ?? null
       }
 
-      const finished = !followUp
       if (session) {
         const items: MockItem[] = session.items.map((it, i) =>
           i === session.currentIndex ? { ...it, interviewId: interviewId!, scores: [...it.scores, score], done: finished } : it,
