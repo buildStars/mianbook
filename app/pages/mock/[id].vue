@@ -6,15 +6,19 @@ interface AiStatus {
   model: string
   remaining: number
   extraHosts: string[]
+  allowUserKey: boolean
 }
 
 const route = useRoute()
 const id = Number(route.params.id)
 const { loggedIn } = useUserSession()
-const { hasKey, config: aiKey, headersFor } = useAiKey()
+const { hasKey: hasStoredKey, config: aiKey, headersFor } = useAiKey()
 const { refresh: refreshReview } = useReview()
 const { load: reloadStudy } = useStudy()
 const { data: ai, refresh: refreshAi } = useFetch<AiStatus>('/api/ai/status', { key: 'ai-status' })
+/** 后台可能关闭了"用户自带 Key"，这时即使浏览器里存着 Key 也不用 */
+const hasKey = computed(() => hasStoredKey.value && ai.value?.allowUserKey !== false)
+const allowOwnKey = computed(() => ai.value?.allowUserKey !== false)
 
 const detail = ref<MockSessionDetail | null>(null)
 const loadError = ref('')
@@ -284,7 +288,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
 
         <p v-if="errorMsg" class="error" role="alert">
           {{ errorMsg }}
-          <button v-if="!hasKey" type="button" class="link-btn" @click="showSettings = true">填写自己的 API Key</button>
+          <button v-if="!hasKey && allowOwnKey" type="button" class="link-btn" @click="showSettings = true">填写自己的 API Key</button>
         </p>
       </section>
 

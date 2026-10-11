@@ -1,19 +1,29 @@
-/** 检查 AI 配置：Key 是否有效、配置的模型是否在可用列表里 */
+import { z } from 'zod'
+
+const schema = z.object({
+  /** 想试的模型；不传时检查当前生效的模型 */
+  model: z.string().trim().max(128).regex(/^[\w.:/@-]*$/).optional(),
+}).optional()
+
+/** 检查站点的 AI 配置：Key 是否有效，并实际调用一次模型；保存设置前可以先试新模型 */
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
-  const { baseUrl, apiKey, model, dailyLimit } = aiConfig()
-  const base = { baseUrl, model, dailyLimit, configured: Boolean(apiKey) }
-  if (!apiKey) return { ...base, ok: false, message: '还没有配置 NUXT_AI_API_KEY', models: [] as string[] }
+  const body = await readValidated(event, schema)
+  const target = siteTarget()
+  const model = body?.model || target.model
+  const base = { baseUrl: target.baseUrl, model, configured: Boolean(target.apiKey) }
+  if (!target.apiKey) return { ...base, ok: false, message: '还没有在 .env 里配置 NUXT_AI_API_KEY', models: [] as string[] }
+
+  let models: string[] = []
   try {
-    const models = await listModels(siteTarget())
-    const found = models.includes(model)
-    return {
-      ...base,
-      ok: found,
-      message: found ? '连接正常，模型可用' : `连接正常，但可用模型里没有 ${model}，请修改 NUXT_AI_MODEL`,
-      models,
-    }
+    models = await listModels(target)
+  } catch {
+    // 有的服务商没有 /models 接口，不影响使用
+  }
+  try {
+    await pingModel({ ...target, model })
+    return { ...base, ok: true, message: `连接正常，${model} 可以使用`, models }
   } catch (error) {
-    return { ...base, ok: false, message: describeAiError(error), models: [] as string[] }
+    return { ...base, ok: false, message: describeAiError(error, { ...target, model }), models }
   }
 })

@@ -9,6 +9,7 @@ interface AiStatus {
   dailyLimit: number
   remaining: number
   extraHosts: string[]
+  allowUserKey: boolean
 }
 
 const MAX_ROUNDS = 3
@@ -17,7 +18,10 @@ const route = useRoute()
 const { loggedIn, user } = useUserSession()
 const { records, setStatus } = useStudy()
 const { data: ai, refresh: refreshAi } = useFetch<AiStatus>('/api/ai/status', { key: 'ai-status' })
-const { config: aiKey, hasKey, headersFor } = useAiKey()
+const { config: aiKey, hasKey: hasStoredKey, headersFor } = useAiKey()
+/** 后台可能关闭了"用户自带 Key"，这时即使浏览器里存着 Key 也不用 */
+const hasKey = computed(() => hasStoredKey.value && ai.value?.allowUserKey !== false)
+const allowOwnKey = computed(() => ai.value?.allowUserKey !== false)
 const showSettings = ref(false)
 /** 站点配了 Key，或者用户填了自己的 Key，都可以面试 */
 const canUse = computed(() => hasKey.value || Boolean(ai.value?.enabled))
@@ -188,7 +192,7 @@ const formatTime = (iso: string) =>
         <span v-if="loggedIn && hasKey" class="quota own" :title="`使用你自己的 API Key，模型：${aiKey?.model}`">自己的 Key · {{ aiKey?.model }}</span>
         <span v-else-if="ai?.enabled && loggedIn" class="quota" :title="`模型：${ai.model}`">今日剩余 {{ ai.remaining }} 次</span>
         <button
-          v-if="loggedIn"
+          v-if="loggedIn && allowOwnKey"
           type="button"
           class="settings-btn"
           :aria-expanded="showSettings"
@@ -223,7 +227,7 @@ const formatTime = (iso: string) =>
       <span class="notice-text">
         站点还没有配置 AI 服务，填写你自己的 API Key 就可以使用。<template v-if="user?.role === 'admin'">也可以在 <code>.env</code> 里填写 <code>NUXT_AI_API_KEY</code> 给所有用户开启。</template>
       </span>
-      <button type="button" class="btn btn-sm btn-primary" @click="showSettings = true">填写 API Key</button>
+      <button v-if="allowOwnKey" type="button" class="btn btn-sm btn-primary" @click="showSettings = true">填写 API Key</button>
     </div>
 
     <template v-else-if="loggedIn && canUse">
@@ -239,7 +243,7 @@ const formatTime = (iso: string) =>
             开始面试
           </button>
           <span v-if="outOfQuota" class="intro-tip">
-            今天的次数用完了，可以<button type="button" class="link-btn" @click="showSettings = true">填写自己的 API Key</button>继续
+            今天的次数用完了<template v-if="allowOwnKey">，可以<button type="button" class="link-btn" @click="showSettings = true">填写自己的 API Key</button>继续</template><template v-else>，明天再来</template>
           </span>
           <span v-else class="intro-tip">建议先打开"自测模式"，不看答案直接作答</span>
         </div>

@@ -1,7 +1,7 @@
 import { eq, max } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
   const body = await readValidated(event, questionSchema)
   const db = useDb()
 
@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       })
       .$returningId()
     invalidateContent()
+    await recordVersion(created!.id, admin.id)
     // 写回 content/ 下的 Markdown，保持文件和数据库一致
     const sync = await writeQuestionFile(created!.id)
     return { id: created!.id, sync }

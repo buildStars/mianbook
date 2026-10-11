@@ -4,6 +4,11 @@ const emit = defineEmits<{ save: [] }>()
 
 type Mode = 'split' | 'edit' | 'preview'
 const mode = ref<Mode>('split')
+const MODES: { value: Mode; label: string }[] = [
+  { value: 'edit', label: '编辑' },
+  { value: 'split', label: '分栏' },
+  { value: 'preview', label: '预览' },
+]
 const html = ref('')
 const rendering = ref(false)
 const textarea = ref<HTMLTextAreaElement>()
@@ -31,7 +36,11 @@ watch(model, () => {
   clearTimeout(timer)
   timer = setTimeout(render, 400)
 })
-onMounted(render)
+onMounted(() => {
+  // 手机上分栏太挤，默认只显示编辑区
+  if (window.innerWidth < 900) mode.value = 'edit'
+  render()
+})
 
 /** 在光标处插入内容；选中了文字时包裹选区 */
 function insert(before: string, after = '', placeholder = '') {
@@ -78,6 +87,50 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+/** 跳到第 line 行并选中这一行（格式检查里点问题时用） */
+function goToLine(line: number) {
+  if (mode.value === 'preview') mode.value = 'split'
+  nextTick(() => {
+    const el = textarea.value
+    if (!el) return
+    const lines = model.value.split('\n')
+    const n = Math.min(Math.max(1, line), lines.length)
+    const start = lines.slice(0, n - 1).reduce((sum, l) => sum + l.length + 1, 0)
+    const end = start + (lines[n - 1]?.length ?? 0)
+
+    // 长行会自动折行，不能直接用行号乘行高；用一个排版相同的隐藏元素量出这一行的位置
+    const cs = getComputedStyle(el)
+    const mirror = document.createElement('div')
+    Object.assign(mirror.style, {
+      position: 'absolute',
+      top: '0',
+      left: '-9999px',
+      visibility: 'hidden',
+      boxSizing: 'border-box',
+      width: `${el.clientWidth}px`,
+      padding: cs.padding,
+      font: cs.font,
+      lineHeight: cs.lineHeight,
+      letterSpacing: cs.letterSpacing,
+      tabSize: cs.tabSize,
+      whiteSpace: 'pre-wrap',
+      overflowWrap: 'break-word',
+    })
+    // 末尾补一个零宽字符，空行也能量出高度
+    mirror.textContent = `${model.value.slice(0, start)}​`
+    document.body.appendChild(mirror)
+    const top = mirror.scrollHeight - parseFloat(cs.lineHeight) - parseFloat(cs.paddingBottom)
+    mirror.remove()
+
+    el.focus({ preventScroll: true })
+    el.setSelectionRange(start, end)
+    el.scrollTop = Math.max(0, top - el.clientHeight / 3)
+    syncScroll()
+  })
+}
+
+defineExpose({ goToLine })
+
 /** 编辑区滚动时，预览区按比例跟随 */
 function syncScroll() {
   const src = textarea.value
@@ -94,11 +147,9 @@ function syncScroll() {
       <button v-for="t in tools" :key="t.label" type="button" :title="t.title" @click="t.run">{{ t.label }}</button>
       <span class="spacer" />
       <span v-if="rendering" class="status">渲染中…</span>
-      <ElRadioGroup v-model="mode" size="small">
-        <ElRadioButton value="edit">编辑</ElRadioButton>
-        <ElRadioButton value="split">分栏</ElRadioButton>
-        <ElRadioButton value="preview">预览</ElRadioButton>
-      </ElRadioGroup>
+      <div class="a-seg mode" role="group" aria-label="显示方式">
+        <button v-for="m in MODES" :key="m.value" type="button" :aria-pressed="mode === m.value" @click="mode = m.value">{{ m.label }}</button>
+      </div>
     </div>
     <div class="panes" :class="mode">
       <textarea
@@ -158,6 +209,16 @@ function syncScroll() {
   flex: 1;
 }
 
+.a-seg.mode {
+  padding: 2px;
+}
+
+.a-seg.mode button {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
 .status {
   margin-right: 8px;
   font-size: 12px;
@@ -166,7 +227,8 @@ function syncScroll() {
 
 .panes {
   display: grid;
-  height: calc(100vh - 260px);
+  /* 页面可以用 --md-editor-h 指定编辑区高度 */
+  height: var(--md-editor-h, calc(100vh - 260px));
   min-height: 420px;
 }
 

@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  const { apiKey, model, dailyLimit, extraHosts } = aiConfig()
+  const { apiKey, model, dailyLimit, extraHosts, allowUserKey } = aiConfig()
   const session = await getUserSession(event)
   const used = session.user ? await aiUsageToday(session.user.id) : 0
   return {
@@ -10,5 +10,7 @@ export default defineEventHandler(async (event) => {
     remaining: Math.max(0, dailyLimit - used),
     /** 用户自带 Key 时，除预设服务商外额外允许的域名 */
     extraHosts,
+    /** 后台是否允许用户填自己的 Key */
+    allowUserKey,
   }
 })

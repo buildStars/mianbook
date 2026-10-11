@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const admin = await requireAdmin(event)
   const id = idParam(event)
   const body = await readValidated(event, questionSchema)
   const db = useDb()
@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!category) throw createError({ statusCode: 400, message: '分类不存在' })
 
   const previous = await questionFileLocation(id)
+  const before = await questionSnapshot(id)
   const rendered = await renderMarkdown(body.contentMd)
   try {
     const [result] = await db
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
     throw error
   }
   invalidateContent()
+  await recordVersion(id, admin.id, before)
   const sync = await writeQuestionFile(id, previous)
   return { id, sync }
 })

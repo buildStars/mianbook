@@ -1,0 +1,215 @@
+/* ==========================================================================
+   管理后台
+   和前台同一套令牌：宋体标题、墨色主按钮、克莱因蓝表示当前位置和链接。
+   Element Plus 只负责表单、表格、弹窗这些复杂控件，外观在这里统一
+   ========================================================================== */
+
+/* Element Plus 的主按钮和前台的 .btn-primary 一样用墨色；链接按钮仍是克莱因蓝 */
+.el-button--primary:not(.is-link):not(.is-text):not(.el-button--danger) {
+  --el-button-bg-color: var(--c-ink);
+  --el-button-border-color: var(--c-ink);
+  --el-button-text-color: var(--c-on-ink);
+  --el-button-hover-bg-color: var(--c-ink-hover);
+  --el-button-hover-border-color: var(--c-ink-hover);
+  --el-button-hover-text-color: var(--c-on-ink);
+  --el-button-active-bg-color: var(--c-ink);
+  --el-button-active-border-color: var(--c-ink);
+  --el-button-disabled-bg-color: var(--c-text-3);
+  --el-button-disabled-border-color: var(--c-text-3);
+  --el-button-disabled-text-color: var(--c-on-ink);
+}
+
+.el-button {
+  font-weight: 600;
+}
+
+.el-message-box__title,
+.el-dialog__title {
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+
+/* ---------- 卡片 ---------- */
+.a-card {
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-elv);
+  box-shadow: var(--shadow-xs);
+}
+
+.a-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 16px 20px 0;
+}
+
+.a-card-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.a-card-head .aside {
+  font-size: 12.5px;
+  color: var(--c-text-3);
+}
+
+.a-card-body {
+  padding: 14px 20px 18px;
+}
+
+/* ---------- 图标按钮 ---------- */
+.a-icon-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast),
+    color var(--dur-fast);
+}
+
+.a-icon-btn:hover {
+  background: var(--c-default-soft);
+  color: var(--c-text-1);
+}
+
+.a-icon-btn.danger:hover {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+
+.a-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- 分段选择 ---------- */
+.a-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--c-bg-mute);
+}
+
+.a-seg button {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast),
+    color var(--dur-fast),
+    box-shadow var(--dur-fast);
+}
+
+.a-seg button:hover {
+  color: var(--c-text-1);
+}
+
+.a-seg button[aria-pressed='true'] {
+  background: var(--c-bg-elv);
+  box-shadow: var(--shadow-xs), 0 0 0 1px var(--c-divider);
+  color: var(--c-text-1);
+  font-weight: 600;
+}
+
+/* ---------- 数字 ---------- */
+.a-num {
+  font-family: var(--font-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.a-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.a-empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+
+/* ---------- 表格 ---------- */
+.a-table.el-table {
+  --el-table-header-bg-color: var(--c-bg-soft);
+  --el-table-header-text-color: var(--c-text-3);
+  --el-table-row-hover-bg-color: var(--c-brand-softer);
+  --el-table-border-color: var(--c-divider);
+  font-size: 14px;
+}
+
+.a-table.el-table th.el-table__cell {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.a-table.el-table .el-table__cell {
+  padding: 10px 0;
+}
+
+/* ---------- 提示条 ---------- */
+.a-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  font-size: 13.5px;
+}
+
+.a-alert.warn {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+}
+
+.a-alert.info {
+  background: var(--c-brand-softer);
+  color: var(--c-text-2);
+}
+
+.a-alert.ok {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+
+.a-alert.bad {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+
+.a-alert .a-alert-action {
+  margin-left: auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.a-code {
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  background: var(--c-default-soft);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}

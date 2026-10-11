@@ -39,7 +39,7 @@ describe('账号和权限', () => {
     const c = new Client()
     const me = await c.register('normal')
     expect(me.role).toBe('user')
-    expect((await c.request('/api/admin/stats')).status).toBe(403)
+    expect((await c.request('/api/admin/dashboard')).status).toBe(403)
   })
 
   it('只能看到自己的模拟面试', async () => {

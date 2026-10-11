@@ -240,3 +240,30 @@ export const events = mysqlTable(
   },
   (t) => [index('events_user_created_idx').on(t.userId, t.createdAt)],
 )
+
+/** 站点设置：后台可以在线修改的配置（键值对），比如 AI 的模型、次数和价格。API Key 仍然只放 .env */
+export const settings = mysqlTable('settings', {
+  key: varchar('key', { length: 64 }).primaryKey(),
+  value: json('value').notNull(),
+  updatedAt: updatedAt(),
+})
+
+/** 题目的历史版本：后台每次保存前，把改动前的内容存一份，可以对比和恢复 */
+export const questionVersions = mysqlTable(
+  'question_versions',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    questionId: int('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 255 }).notNull(),
+    difficulty: tinyint('difficulty').notNull(),
+    tags: json('tags').$type<string[]>().notNull(),
+    status: mysqlEnum('status', ['draft', 'published']).notNull(),
+    contentMd: mediumtext('content_md').notNull(),
+    /** 谁做的这次修改（被覆盖掉的是这个版本） */
+    editorId: int('editor_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('question_versions_question_idx').on(t.questionId, t.createdAt)],
+)

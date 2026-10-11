@@ -20,7 +20,22 @@ export interface AiTarget {
   model: string
 }
 
+/** 当前生效的 AI 配置：后台在线改过的项覆盖 .env 的默认值；接口地址和 Key 只来自 .env */
 export function aiConfig() {
+  const env = aiEnvConfig()
+  const o = aiOverrides()
+  return {
+    ...env,
+    model: o.model || env.model,
+    dailyLimit: o.dailyLimit ?? env.dailyLimit,
+    extraHosts: o.extraHosts ?? env.extraHosts,
+    allowUserKey: o.allowUserKey ?? true,
+    pricing: o.pricing ?? null,
+  }
+}
+
+/** .env 里的 AI 配置（默认值） */
+export function aiEnvConfig() {
   const { ai } = useRuntimeConfig()
   return {
     baseUrl: String(ai.baseUrl || '').replace(/\/+$/, ''),
@@ -51,6 +66,8 @@ export function allowedUserHosts(extraHosts: string[] = aiConfig().extraHosts): 
  * Base URL 只能是 https 且域名在白名单里，防止借服务器去请求内网地址（SSRF）
  */
 export function userTarget(event: H3Event): AiTarget | null {
+  // 后台关闭了"用户自带 Key"时忽略请求头，统一用站点的 Key
+  if (!aiConfig().allowUserKey) return null
   return parseUserTarget(
     {
       apiKey: getHeader(event, AI_HEADERS.apiKey),

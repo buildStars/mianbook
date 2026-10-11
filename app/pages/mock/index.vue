@@ -8,12 +8,16 @@ interface AiStatus {
   model: string
   remaining: number
   extraHosts: string[]
+  allowUserKey: boolean
 }
 
 const { loggedIn } = useUserSession()
 const { outline } = useOutline()
-const { hasKey, config: aiKey, headersFor } = useAiKey()
+const { hasKey: hasStoredKey, config: aiKey, headersFor } = useAiKey()
 const { data: ai } = useFetch<AiStatus>('/api/ai/status', { key: 'ai-status' })
+/** 后台可能关闭了"用户自带 Key"，这时即使浏览器里存着 Key 也不用 */
+const hasKey = computed(() => hasStoredKey.value && ai.value?.allowUserKey !== false)
+const allowOwnKey = computed(() => ai.value?.allowUserKey !== false)
 const showSettings = ref(false)
 
 const form = reactive({
@@ -298,7 +302,7 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
             <template v-if="hasKey">使用你自己的 Key（{{ aiKey?.model }}），不限次数。</template>
             <template v-else-if="ai?.enabled">今天还剩 {{ ai.remaining }} 次，不够时可以中途停下，下次接着答。</template>
             <template v-else>站点没有配置 AI 服务，需要填写你自己的 API Key。</template>
-            <button type="button" class="link-btn" @click="showSettings = !showSettings">{{ hasKey ? 'AI 设置' : '用自己的 Key' }}</button>
+            <button v-if="allowOwnKey" type="button" class="link-btn" @click="showSettings = !showSettings">{{ hasKey ? 'AI 设置' : '用自己的 Key' }}</button>
           </p>
           <button
             type="button"
