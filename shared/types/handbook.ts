@@ -96,3 +96,103 @@ export interface SearchHit {
   category: string
   snippet: string
 }
+
+/** 复习评分：1 不会、2 模糊、3 会了、4 很熟（对应 FSRS 的 Again / Hard / Good / Easy） */
+export type ReviewGrade = 1 | 2 | 3 | 4
+
+/** 存进数据库的 FSRS 卡片（日期用 ISO 字符串） */
+export interface StoredCard {
+  due: string
+  stability: number
+  difficulty: number
+  elapsedDays: number
+  scheduledDays: number
+  learningSteps: number
+  reps: number
+  lapses: number
+  state: number
+  lastReview: string | null
+}
+
+/** 今日待复习的一道题 */
+export interface ReviewItem {
+  id: number
+  num: number
+  title: string
+  path: string
+  category: string
+  difficulty: number
+  status: StudyStatus | null
+  /** 下次复习时间 */
+  due: string
+  reps: number
+  lapses: number
+  /** "一句话回答"的 HTML，复习时先自己想，再展开对照 */
+  answerHtml: string
+  /** 选每个评分后，下次复习在几天后 */
+  intervals: Record<ReviewGrade, number>
+}
+
+export interface ReviewSummary {
+  /** 今天（含逾期）要复习的题数 */
+  dueToday: number
+  /** 复习计划里的题数 */
+  total: number
+  /** 今天已经复习的题数 */
+  doneToday: number
+  /** 连续复习天数（今天还没复习时，从昨天往前数） */
+  streak: number
+  /** 未来 7 天每天到期的题数，第一项是今天（含逾期） */
+  forecast: { date: string; count: number }[]
+}
+
+export type MockDifficulty = 'basic' | 'advanced' | 'deep' | 'mixed'
+
+export interface MockConfig {
+  /** 方向，如 frontend、go-backend；自定义时为 custom */
+  track: string
+  categoryIds: number[]
+  difficulty: MockDifficulty
+  count: number
+  /** 每道题追问几次（0～2） */
+  followUps: number
+  /** 优先抽不会、模糊和到期该复习的题 */
+  preferWeak: boolean
+}
+
+export interface MockItem {
+  questionId: number
+  interviewId: number | null
+  /** 每一轮的得分 */
+  scores: (number | null)[]
+  skipped: boolean
+  /** 这道题是否已经答完（含追问）或跳过 */
+  done: boolean
+}
+
+export interface MockQuestionInfo {
+  id: number
+  num: number
+  title: string
+  path: string
+  category: string
+  difficulty: number
+}
+
+export interface MockSessionSummary {
+  id: number
+  title: string
+  status: 'active' | 'finished'
+  count: number
+  answered: number
+  score: number | null
+  createdAt: string
+  finishedAt: string | null
+}
+
+export interface MockSessionDetail extends MockSessionSummary {
+  config: MockConfig
+  currentIndex: number
+  items: (MockItem & { question: MockQuestionInfo; turns: InterviewTurn[] })[]
+  report: string | null
+}

@@ -5,6 +5,7 @@ const { outline, all, firstPathOf } = useOutline()
 const { records } = useStudy()
 const { loggedIn } = useUserSession()
 const { last } = useLastVisited()
+const { summary } = useReview()
 
 const firstPath = computed(() => all.value[0]?.path ?? '/')
 const categoryCount = computed(() => outline.value.reduce((n, p) => n + p.categories.length, 0))
@@ -56,7 +57,7 @@ const steps = [
           </p>
           <div class="cta">
             <NuxtLink :to="firstPath" class="btn btn-primary btn-lg">
-              开始复习
+              开始刷题
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
             </NuxtLink>
             <NuxtLink :to="tryPath" class="btn btn-lg ai-outline">
@@ -65,11 +66,18 @@ const steps = [
             </NuxtLink>
           </div>
           <ClientOnly>
-            <NuxtLink v-if="last" :to="last.path" class="resume">
-              <span class="resume-label">继续上次</span>
-              <span class="resume-title">No.{{ last.num }} {{ plainTitle(last.title) }}</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-            </NuxtLink>
+            <div class="resumes">
+              <NuxtLink v-if="summary?.dueToday" to="/review" class="resume">
+                <span class="resume-label due">今日复习</span>
+                <span class="resume-title">{{ summary.dueToday }} 道题到期<template v-if="summary.streak">，已连续 {{ summary.streak }} 天</template></span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+              </NuxtLink>
+              <NuxtLink v-if="last" :to="last.path" class="resume">
+                <span class="resume-label">继续上次</span>
+                <span class="resume-title">No.{{ last.num }} {{ plainTitle(last.title) }}</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+              </NuxtLink>
+            </div>
           </ClientOnly>
         </div>
 
@@ -147,7 +155,7 @@ const steps = [
               </NuxtLink>
             </div>
           </div>
-          <NuxtLink :to="firstPathOf(part)" class="part-go" :aria-label="`从第一题开始复习${part.title}`">
+          <NuxtLink :to="firstPathOf(part)" class="part-go" :aria-label="`从第一题开始学习${part.title}`">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </NuxtLink>
         </li>
@@ -165,9 +173,12 @@ const steps = [
           <ol class="ai-steps">
             <li><b class="num">01</b><div><strong>作答</strong><span>像面试一样，用自己的话讲一遍</span></div></li>
             <li><b class="num">02</b><div><strong>点评</strong><span>0～10 分，答对的点、遗漏和错误逐条列出</span></div></li>
-            <li><b class="num">03</b><div><strong>追问</strong><span>最多 3 轮；低分题自动加入待复习</span></div></li>
+            <li><b class="num">03</b><div><strong>追问</strong><span>最多 3 轮；低分题自动加入复习计划</span></div></li>
           </ol>
-          <NuxtLink :to="tryPath" class="btn btn-ai btn-lg">去试一道题</NuxtLink>
+          <div class="ai-actions">
+            <NuxtLink to="/mock" class="btn btn-ai btn-lg">来一场整场模拟面试</NuxtLink>
+            <NuxtLink :to="tryPath" class="ai-try">或者先试一道题 →</NuxtLink>
+          </div>
         </div>
 
         <div class="chat" aria-hidden="true">
@@ -214,7 +225,7 @@ const steps = [
           <p v-else>进度会自动保存，随时在"我的进度"里查看。</p>
         </div>
         <div class="closing-actions">
-          <NuxtLink :to="firstPath" class="btn btn-primary btn-lg">开始复习</NuxtLink>
+          <NuxtLink :to="firstPath" class="btn btn-primary btn-lg">开始刷题</NuxtLink>
           <NuxtLink v-if="!loggedIn" to="/register" class="btn btn-lg">免费注册</NuxtLink>
           <NuxtLink v-else to="/progress" class="btn btn-lg">我的进度</NuxtLink>
         </div>
@@ -351,6 +362,17 @@ const steps = [
   color: var(--c-brand);
   font-size: 12px;
   font-weight: 600;
+}
+
+.resume-label.due {
+  background: color-mix(in srgb, var(--c-seal) 14%, transparent);
+  color: var(--c-seal);
+}
+
+.resumes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
 }
 
 .resume-title {
@@ -771,6 +793,22 @@ html.dark .ai-band {
 
 .ai-band .eyebrow {
   color: #b6a9ff;
+}
+
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.ai-try {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.ai-try:hover {
+  color: #fff;
 }
 
 .ai-band h2 {

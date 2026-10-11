@@ -43,7 +43,10 @@ export function buildInterviewMessages(input: {
   reference: string
   turns: InterviewTurn[]
   answer: string
+  /** 一共几轮，整场模拟面试里按设置的追问次数决定 */
+  maxRounds?: number
 }): ChatMessage[] {
+  const maxRounds = input.maxRounds ?? MAX_ROUNDS
   const round = input.turns.length + 1
   const currentQuestion = round === 1 ? input.title : input.turns.at(-1)!.followUp!
   const history = input.turns
@@ -58,8 +61,8 @@ export function buildInterviewMessages(input: {
     `【面试题】${input.title}`,
     `【参考答案】\n${compactReference(input.reference)}`,
     history ? `【之前的问答】\n${history}` : '',
-    `【本轮问题】（第 ${round} 轮，共 ${MAX_ROUNDS} 轮）${currentQuestion}`,
-    round >= MAX_ROUNDS ? '这是最后一轮，"追问"部分只写"无"。' : '',
+    `【本轮问题】（第 ${round} 轮，共 ${maxRounds} 轮）${currentQuestion}`,
+    round >= maxRounds ? '这是最后一轮，"追问"部分只写"无"。' : '',
     `【本轮回答】\n${wrapAnswer(input.answer)}`,
   ]
     .filter(Boolean)
@@ -95,4 +98,42 @@ export function statusFromScore(score: number | null): StudyStatus | null {
   if (score <= 4) return 'weak'
   if (score <= 7) return 'fuzzy'
   return null
+}
+
+const REPORT_PROMPT = `你是一名资深技术面试官，刚刚对候选人做完一场模拟面试。你会拿到每道题的题目、所属分类、各轮得分，以及你当时点评里"遗漏或不准确"的要点。请据此写一份简短的面试总结，帮助候选人决定接下来怎么复习。
+
+严格按下面的格式输出 Markdown，不要输出别的内容：
+### 总体评价
+两三句话：整体水平、和目标岗位要求的差距。
+### 做得好的地方
+- 逐条列出，引用具体题目；没有就写"无"
+### 主要问题
+- 按严重程度排序，指出知识盲区或回答习惯上的问题（比如只答结论不讲原理），引用具体题目
+### 复习建议
+- 3～5 条，按优先级排列，具体到要复习的知识点
+
+只依据提供的数据，不要编造候选人没答过的内容。`
+
+/** 从一轮点评里取出"遗漏或不准确"那一节，截断后用于生成总结 */
+function missingPart(feedback: string): string {
+  const section = feedback.split(/^#{1,4}\s*遗漏或不准确\s*$/m)[1]?.split(/^#{1,4}\s/m)[0] ?? ''
+  return section.trim().slice(0, 400)
+}
+
+export function buildReportMessages(input: {
+  track: string
+  items: { title: string; category: string; skipped: boolean; scores: (number | null)[]; feedbacks: string[] }[]
+}): ChatMessage[] {
+  const lines = input.items.map((item, i) => {
+    const head = `${i + 1}. 【${item.category}】${item.title}`
+    if (item.skipped) return `${head}\n   候选人选择跳过（不会）`
+    if (!item.scores.length) return `${head}\n   没有作答`
+    const scores = item.scores.map((s, k) => `第 ${k + 1} 轮 ${s ?? '未知'} 分`).join('，')
+    const missing = item.feedbacks.map(missingPart).filter(Boolean).join('\n')
+    return `${head}\n   得分：${scores}\n   当时指出的问题：\n${missing.replace(/^/gm, '   ') || '   无'}`
+  })
+  return [
+    { role: 'system', content: REPORT_PROMPT },
+    { role: 'user', content: `【面试方向】${input.track}\n\n【各题情况】\n<data>\n${lines.join('\n\n')}\n</data>` },
+  ]
 }

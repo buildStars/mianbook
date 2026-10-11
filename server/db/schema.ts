@@ -1,6 +1,7 @@
 import {
   boolean,
   datetime,
+  double,
   index,
   int,
   json,
@@ -14,7 +15,7 @@ import {
   varchar,
 } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
-import type { InterviewTurn, TocItem } from '../../shared/types/handbook'
+import type { InterviewTurn, MockConfig, MockItem, StoredCard, TocItem } from '../../shared/types/handbook'
 
 // 用 datetime 而不是 timestamp，避开 2038 年问题；更新时间由 Drizzle 在每次 update 时写入
 const createdAt = () => datetime('created_at', { mode: 'date' }).notNull().default(sql`CURRENT_TIMESTAMP`)
@@ -109,6 +110,30 @@ export const studyRecords = mysqlTable(
   (t) => [primaryKey({ columns: [t.userId, t.questionId] })],
 )
 
+/** 整场模拟面试：按方向抽若干道题连续作答，每道题对应一条 interviews 记录 */
+export const mockSessions = mysqlTable(
+  'mock_sessions',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    userId: int('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 128 }).notNull(),
+    config: json('config').$type<MockConfig>().notNull(),
+    items: json('items').$type<MockItem[]>().notNull(),
+    currentIndex: tinyint('current_index').notNull().default(0),
+    status: mysqlEnum('status', ['active', 'finished']).notNull().default('active'),
+    /** 全部题目的平均分，结束时写入 */
+    score: double('score'),
+    /** AI 生成的面试总结（Markdown） */
+    report: mediumtext('report'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    finishedAt: datetime('finished_at', { mode: 'date' }),
+  },
+  (t) => [index('mock_sessions_user_created_idx').on(t.userId, t.createdAt)],
+)
+
 /** AI 模拟面试：一次面试最多 3 轮，每轮的回答和点评存在 turns 里 */
 export const interviews = mysqlTable(
   'interviews',
@@ -124,6 +149,8 @@ export const interviews = mysqlTable(
     rounds: tinyint('rounds').notNull().default(0),
     /** 最近一轮的得分 */
     score: tinyint('score'),
+    /** 属于哪一场整场模拟面试；单题面试为空。删除那场面试时保留这条记录 */
+    sessionId: int('session_id').references(() => mockSessions.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -144,4 +171,51 @@ export const aiCalls = mysqlTable(
     createdAt: createdAt(),
   },
   (t) => [index('ai_calls_user_created_idx').on(t.userId, t.createdAt)],
+)
+
+/** 间隔重复：每个用户每道题一张卡片，记录 FSRS 算法的记忆状态和下次复习时间 */
+export const reviewCards = mysqlTable(
+  'review_cards',
+  {
+    userId: int('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    questionId: int('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    due: datetime('due', { mode: 'date' }).notNull(),
+    stability: double('stability').notNull(),
+    difficulty: double('difficulty').notNull(),
+    elapsedDays: int('elapsed_days').notNull().default(0),
+    scheduledDays: int('scheduled_days').notNull().default(0),
+    learningSteps: int('learning_steps').notNull().default(0),
+    reps: int('reps').notNull().default(0),
+    lapses: int('lapses').notNull().default(0),
+    /** 0 新卡片、1 学习中、2 复习中、3 重新学习 */
+    state: tinyint('state').notNull().default(0),
+    lastReview: datetime('last_review', { mode: 'date' }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.questionId] }), index('review_cards_user_due_idx').on(t.userId, t.due)],
+)
+
+/** 每次复习评分记一条，用于统计每天复习量、连续天数 */
+export const reviewLogs = mysqlTable(
+  'review_logs',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    userId: int('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    questionId: int('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    /** 1 不会、2 模糊、3 会了、4 很熟 */
+    rating: tinyint('rating').notNull(),
+    /** review 复习页、page 题目页手动标记、interview 单题 AI 面试、mock 整场模拟面试 */
+    source: mysqlEnum('source', ['review', 'page', 'interview', 'mock']).notNull(),
+    /** 评分前的卡片；在题目页上短时间内改主意时，用它撤回上一次评分 */
+    prevCard: json('prev_card').$type<StoredCard | null>(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('review_logs_user_created_idx').on(t.userId, t.createdAt)],
 )

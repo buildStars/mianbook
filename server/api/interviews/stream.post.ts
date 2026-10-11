@@ -1,11 +1,13 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import type { InterviewTurn } from '#shared/types/handbook'
+import type { InterviewTurn, MockItem } from '#shared/types/handbook'
 import type { ChatUsage } from '../../utils/ai'
 
 const schema = z.object({
   questionId: z.number().int().positive(),
   interviewId: z.number().int().positive().optional(),
+  /** 整场模拟面试的 id；单题面试不传 */
+  sessionId: z.number().int().positive().optional(),
   answer: z.string().trim().min(2, '回答太短了').max(3000, '回答最多 3000 字'),
 })
 
@@ -16,23 +18,22 @@ const schema = z.object({
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const body = await readValidated(event, schema)
-
-  // 用户在浏览器里填了自己的 Key 就用它，不受每日次数限制；否则用站点的 Key
-  const config = aiConfig()
-  const target = userTarget(event) ?? siteTarget()
-  const ownKey = target.source === 'user'
-  if (!ownKey && !target.apiKey) {
-    throw createError({ statusCode: 503, message: '站点没有配置 AI 服务，请在 AI 设置里填写你自己的 API Key' })
-  }
-  const used = ownKey ? 0 : await aiUsageToday(user.id)
-  if (!ownKey && used >= config.dailyLimit) {
-    throw createError({
-      statusCode: 429,
-      message: `24 小时内的 AI 面试次数已用完（${config.dailyLimit} 次），可以稍后再来，或在 AI 设置里填写自己的 API Key`,
-    })
-  }
-
   const db = useDb()
+
+  // 整场模拟面试：只能回答当前这道题，轮数按设置的追问次数决定
+  const session = body.sessionId ? await getMockSession(user.id, body.sessionId) : null
+  let maxRounds = MAX_ROUNDS
+  if (session) {
+    const item = session.items[session.currentIndex]
+    if (session.status !== 'active') throw createError({ statusCode: 400, message: '这场面试已经结束' })
+    if (!item || item.questionId !== body.questionId) throw createError({ statusCode: 400, message: '请回答当前这道题' })
+    if (item.done) throw createError({ statusCode: 400, message: '这道题已经答完了，请进入下一题' })
+    if ((item.interviewId ?? undefined) !== body.interviewId) throw createError({ statusCode: 400, message: '面试记录不匹配，请刷新页面' })
+    maxRounds = 1 + session.config.followUps
+  }
+
+  const { target, ownKey, remaining } = await resolveAi(event, user.id)
+
   const [question] = await db
     .select({ id: tables.questions.id, title: tables.questions.title, contentMd: tables.questions.contentMd })
     .from(tables.questions)
@@ -52,18 +53,20 @@ export default defineEventHandler(async (event) => {
         ),
       )
     if (!interview) throw createError({ statusCode: 404, message: '面试记录不存在' })
-    if (interview.rounds >= MAX_ROUNDS || !interview.turns.at(-1)?.followUp) {
+    if (interview.rounds >= maxRounds || !interview.turns.at(-1)?.followUp) {
       throw createError({ statusCode: 400, message: '这次面试已经结束，可以重新开始一次' })
     }
   }
 
   const turns = interview?.turns ?? []
   const round = turns.length + 1
+  const lastRound = round >= maxRounds
   const messages = buildInterviewMessages({
     title: question.title.replace(/`/g, ''),
     reference: question.contentMd,
     turns,
     answer: body.answer,
+    maxRounds,
   })
 
   const stream = createEventStream(event)
@@ -86,7 +89,7 @@ export default defineEventHandler(async (event) => {
       }
       if (!text.trim()) throw new AiError(502, 'AI 没有返回内容，请重试')
 
-      const { score, followUp } = parseFeedback(text, round >= MAX_ROUNDS)
+      const { score, followUp } = parseFeedback(text, lastRound)
       const turn: InterviewTurn = { answer: body.answer, feedback: text, score, followUp, at: new Date().toISOString() }
       const nextTurns = [...turns, turn]
 
@@ -99,9 +102,14 @@ export default defineEventHandler(async (event) => {
       } else {
         const [created] = await db
           .insert(tables.interviews)
-          .values({ userId: user.id, questionId: question.id, turns: nextTurns, rounds: 1, score })
+          .values({ userId: user.id, questionId: question.id, turns: nextTurns, rounds: 1, score, sessionId: session?.id ?? null })
           .$returningId()
         interviewId = created!.id
+      }
+
+      // 第一轮的得分反映"会不会这道题"，计入复习计划；追问考的是深度，不计入
+      if (round === 1 && score !== null) {
+        await reviewQuestion(user.id, question.id, gradeFromScore(score), session ? 'mock' : 'interview')
       }
 
       // 低分的题自动标记为"不会"或"模糊"，方便之后复习
@@ -117,31 +125,20 @@ export default defineEventHandler(async (event) => {
         studyStatus = saved?.status ?? null
       }
 
-      await send('done', {
-        interviewId,
-        round,
-        score,
-        followUp,
-        finished: !followUp,
-        studyStatus,
-        remaining: ownKey ? null : Math.max(0, config.dailyLimit - used - 1),
-      })
+      const finished = !followUp
+      if (session) {
+        const items: MockItem[] = session.items.map((it, i) =>
+          i === session.currentIndex ? { ...it, interviewId: interviewId!, scores: [...it.scores, score], done: finished } : it,
+        )
+        await saveItems(session.id, items)
+      }
+
+      await send('done', { interviewId, round, score, followUp, finished, studyStatus, remaining })
     } catch (error) {
       if (!controller.signal.aborted) await send('error', { message: describeAiError(error, target) })
     } finally {
       // 只要大模型已经开始输出，就算一次调用（中途停止也消耗了 token）
-      if (text) {
-        await db
-          .insert(tables.aiCalls)
-          .values({
-            userId: user.id,
-            // 用自己 Key 的调用单独记一类，不占站点的每日次数
-            kind: ownKey ? 'interview-own' : 'interview',
-            promptTokens: usage?.prompt_tokens ?? null,
-            completionTokens: usage?.completion_tokens ?? null,
-          })
-          .catch(() => {})
-      }
+      if (text) await recordAiCall(user.id, 'interview', ownKey, usage)
       await stream.close()
     }
   })()

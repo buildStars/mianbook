@@ -29,6 +29,7 @@ export function useStudy() {
   const records = useState<StudyRecordMap>('study-records', () => ({}))
   const ready = useState('study-ready', () => false)
   const error = useState<string | null>('study-error', () => null)
+  const { refresh: refreshReview } = useReview()
 
   async function load() {
     if (import.meta.server) return
@@ -71,6 +72,7 @@ export function useStudy() {
       // 保存期间用户可能又改了笔记，以本地为准，只更新时间
       if (saved && records.value[id]) setLocal(id, { ...records.value[id]!, updatedAt: saved.updatedAt })
       error.value = null
+      if (patch.status !== undefined) refreshReview()
     } catch {
       error.value = '保存失败，请检查网络后重试'
     }

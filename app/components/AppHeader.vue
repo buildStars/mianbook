@@ -5,6 +5,8 @@ const route = useRoute()
 const { outline, all, firstPathOf } = useOutline()
 const { records } = useStudy()
 const { loggedIn, user, clear } = useUserSession()
+const { summary } = useReview()
+const dueToday = computed(() => summary.value?.dueToday ?? 0)
 const colorMode = useColorMode()
 const searchOpen = useState('search-open', () => false)
 const sidebarOpen = useState('sidebar-open', () => false)
@@ -68,6 +70,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         >
           {{ part.title }}
         </NuxtLink>
+        <span class="nav-sep" aria-hidden="true" />
+        <NuxtLink to="/review" :class="{ active: route.path === '/review' }">
+          复习<span v-if="dueToday" class="nav-badge" :aria-label="`今天待复习 ${dueToday} 道`">{{ dueToday > 99 ? '99+' : dueToday }}</span>
+        </NuxtLink>
+        <NuxtLink to="/mock" :class="{ active: route.path.startsWith('/mock') }">模拟面试</NuxtLink>
       </nav>
 
       <div class="right">
@@ -118,6 +125,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <template #dropdown>
             <ElDropdownMenu>
               <ElDropdownItem @click="navigateTo('/progress')">我的进度</ElDropdownItem>
+              <ElDropdownItem @click="navigateTo('/review')">今日复习{{ dueToday ? `（${dueToday}）` : '' }}</ElDropdownItem>
+              <ElDropdownItem @click="navigateTo('/mock')">模拟面试</ElDropdownItem>
               <ElDropdownItem v-if="user?.role === 'admin'" @click="navigateTo('/admin')">管理后台</ElDropdownItem>
               <ElDropdownItem divided @click="logout">退出登录</ElDropdownItem>
             </ElDropdownMenu>
@@ -209,6 +218,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .nav a.active::after {
   transform: scaleX(1);
+}
+
+.nav-sep {
+  align-self: center;
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--c-divider);
+}
+
+.nav-badge {
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--c-seal);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
 }
 
 .right {

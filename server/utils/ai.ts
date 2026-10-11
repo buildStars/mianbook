@@ -1,5 +1,6 @@
-import { and, count, eq, gte } from 'drizzle-orm'
+import { and, count, eq, gte, notLike } from 'drizzle-orm'
 import type { H3Event } from 'h3'
+import { AI_HEADERS, AI_PROVIDERS } from '#shared/utils/ai-providers'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -73,13 +74,13 @@ export function userTarget(event: H3Event): AiTarget | null {
   return { source: 'user', baseUrl: `${url.origin}${url.pathname}`.replace(/\/+$/, ''), apiKey, model }
 }
 
-/** 最近 24 小时内用站点 Key 的调用次数（滚动窗口，不受时区影响）；用户自己的 Key 不计入 */
+/** 最近 24 小时内用站点 Key 的调用次数（滚动窗口，不受时区影响）；用户自己的 Key 记为 xxx-own，不计入 */
 export async function aiUsageToday(userId: number): Promise<number> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const [row] = await useDb()
     .select({ total: count() })
     .from(tables.aiCalls)
-    .where(and(eq(tables.aiCalls.userId, userId), eq(tables.aiCalls.kind, 'interview'), gte(tables.aiCalls.createdAt, since)))
+    .where(and(eq(tables.aiCalls.userId, userId), notLike(tables.aiCalls.kind, '%-own'), gte(tables.aiCalls.createdAt, since)))
   return row?.total ?? 0
 }
 
@@ -186,4 +187,37 @@ export async function pingModel(target: AiTarget): Promise<void> {
     redirect: 'error',
   })
   if (!res.ok) throw await toAiError(res, target)
+}
+
+/** 确定这次调用用谁的 Key：请求头里带了用户自己的 Key 就用它（不限次数），否则用站点的 Key 并检查每日次数 */
+export async function resolveAi(event: H3Event, userId: number) {
+  const { dailyLimit } = aiConfig()
+  const target = userTarget(event) ?? siteTarget()
+  const ownKey = target.source === 'user'
+  if (!ownKey && !target.apiKey) {
+    throw createError({ statusCode: 503, message: '站点没有配置 AI 服务，请在 AI 设置里填写你自己的 API Key' })
+  }
+  const used = ownKey ? 0 : await aiUsageToday(userId)
+  if (!ownKey && used >= dailyLimit) {
+    throw createError({
+      statusCode: 429,
+      message: `24 小时内的 AI 次数已用完（${dailyLimit} 次），可以稍后再来，或在 AI 设置里填写自己的 API Key`,
+    })
+  }
+  /** 这次调用之后还剩几次；用自己的 Key 时为 null */
+  const remaining = ownKey ? null : Math.max(0, dailyLimit - used - 1)
+  return { target, ownKey, remaining }
+}
+
+/** 记一次大模型调用；用自己 Key 的记成 xxx-own，不占站点的每日次数 */
+export function recordAiCall(userId: number, kind: 'interview' | 'report', ownKey: boolean, usage?: ChatUsage) {
+  return useDb()
+    .insert(tables.aiCalls)
+    .values({
+      userId,
+      kind: ownKey ? `${kind}-own` : kind,
+      promptTokens: usage?.prompt_tokens ?? null,
+      completionTokens: usage?.completion_tokens ?? null,
+    })
+    .catch(() => {})
 }

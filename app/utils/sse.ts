@@ -29,3 +29,30 @@ export async function* readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator
     reader.releaseLock()
   }
 }
+
+/**
+ * POST 一个返回 SSE 的接口，逐个回调事件。
+ * 请求失败或收到 error 事件时抛出 Error，消息是服务端给的提示
+ */
+export async function postSSE(
+  url: string,
+  body: unknown,
+  options: { headers?: Record<string, string>; signal?: AbortSignal },
+  onEvent: (event: string, data: any) => void,
+): Promise<void> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    body: JSON.stringify(body),
+    signal: options.signal,
+  })
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => null)
+    throw new Error(data?.message || `请求失败（${res.status}）`)
+  }
+  for await (const ev of readSSE(res.body)) {
+    const data = JSON.parse(ev.data)
+    if (ev.event === 'error') throw new Error(data.message)
+    onEvent(ev.event, data)
+  }
+}

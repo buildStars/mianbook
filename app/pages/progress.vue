@@ -6,10 +6,11 @@ useHead({ title: '我的进度 | 全栈面试手册' })
 const { outline, all } = useOutline()
 const { records, ready, importRecords, clearAll } = useStudy()
 const { loggedIn } = useUserSession()
+const { summary } = useReview()
 
 type Filter = 'review' | 'new' | 'star' | 'all'
 const filters: { value: Filter; label: string; empty: string }[] = [
-  { value: 'review', label: '待复习', empty: '没有待复习的题。标记为"不会""模糊"，或者 AI 面试低于 8 分的题会出现在这里。' },
+  { value: 'review', label: '没掌握', empty: '没有标为"不会""模糊"的题。AI 面试低于 8 分的题也会出现在这里。' },
   { value: 'new', label: '未学', empty: '所有题目都学过了，了不起 🎉' },
   { value: 'star', label: '收藏', empty: '还没有收藏的题目。在题目页点"收藏"就会出现在这里。' },
   { value: 'all', label: '全部', empty: '还没有题目。' },
@@ -169,10 +170,16 @@ async function onClear() {
       </div>
 
       <div class="cards">
-        <div class="stat review" :class="{ hot: counts.review }">
-          <span class="stat-label">待复习</span>
+        <div v-if="loggedIn" class="stat review" :class="{ hot: summary?.dueToday }">
+          <span class="stat-label">今日复习</span>
+          <strong class="serif">{{ summary?.dueToday ?? 0 }}</strong>
+          <p>按遗忘规律安排，今天到期的题<template v-if="summary?.streak"> · 已连续 {{ summary.streak }} 天</template></p>
+          <NuxtLink to="/review" class="btn btn-primary btn-sm">{{ summary?.dueToday ? '开始复习' : '查看复习计划' }}</NuxtLink>
+        </div>
+        <div v-else class="stat review" :class="{ hot: counts.review }">
+          <span class="stat-label">没掌握</span>
           <strong class="serif">{{ counts.review }}</strong>
-          <p>标"不会""模糊"或 AI 面试低分的题</p>
+          <p>标"不会""模糊"的题；登录后会按遗忘规律安排复习</p>
           <button type="button" class="btn btn-primary btn-sm" :disabled="!stats.total" @click="randomPick">
             {{ counts.review ? '抽一道复习' : '随机抽一题' }}
           </button>

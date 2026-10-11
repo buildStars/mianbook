@@ -20,6 +20,10 @@ export default defineEventHandler(async (event) => {
   if (!question) throw createError({ statusCode: 404, message: '题目不存在' })
 
   const current = await getStudyRecord(user.id, questionId)
+  // 手动标记掌握程度也算一次复习，加入或更新复习计划；清除标记不影响已有的计划
+  if (body.status && body.status !== current?.status) {
+    await reviewQuestion(user.id, questionId, gradeFromStatus[body.status], 'page')
+  }
   return saveStudyRecord(user.id, questionId, {
     status: body.status !== undefined ? body.status : (current?.status ?? null),
     starred: body.starred ?? current?.starred ?? false,

@@ -46,6 +46,10 @@ export default defineEventHandler(async (event) => {
       skipped++
       continue
     }
+    // 还没有复习计划的题，按导入的掌握程度加入计划
+    if (record.status && !(await getReviewCard(user.id, id))) {
+      await reviewQuestion(user.id, id, gradeFromStatus[record.status], 'page')
+    }
     await saveStudyRecord(user.id, id, {
       status: record.status ?? null,
       starred: record.starred ?? record.star ?? false,

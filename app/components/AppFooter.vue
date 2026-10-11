@@ -21,6 +21,8 @@ const searchOpen = useState('search-open', () => false)
         </div>
         <div>
           <p class="col-title">学习</p>
+          <NuxtLink to="/review">今日复习</NuxtLink>
+          <NuxtLink to="/mock">模拟面试</NuxtLink>
           <NuxtLink to="/progress">我的进度</NuxtLink>
           <button type="button" @click="searchOpen = true">搜索题目</button>
         </div>
