@@ -2,6 +2,8 @@ node_modules
 .nuxt
 .output
 .data
+.nuxt-test
+.output-test
 .mysql
 
 # 本地环境变量里有数据库密码、会话密钥和 AI Key，不能提交

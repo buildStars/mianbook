@@ -12,7 +12,7 @@ export default defineEventHandler(async (event): Promise<InterviewSummary[]> => 
     .select()
     .from(tables.interviews)
     .where(and(eq(tables.interviews.userId, user.id), eq(tables.interviews.questionId, questionId)))
-    .orderBy(desc(tables.interviews.updatedAt))
+    .orderBy(desc(tables.interviews.updatedAt), desc(tables.interviews.id))
     .limit(10)
   return rows.map((r) => ({
     id: r.id,

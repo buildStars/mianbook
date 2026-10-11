@@ -17,7 +17,10 @@
     "db:import": "tsx scripts/db.ts import",
     "db:export": "tsx scripts/db.ts export",
     "db:rerender": "tsx scripts/db.ts rerender",
-    "content:check": "node scripts/check-content.mjs"
+    "content:check": "node scripts/check-content.mjs",
+    "test": "vitest run --project unit",
+    "test:api": "vitest run --project api",
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@element-plus/nuxt": "1.1.5",
@@ -40,6 +43,7 @@
   },
   "devDependencies": {
     "drizzle-kit": "0.31.11",
-    "tsx": "4.23.15"
+    "tsx": "4.23.15",
+    "vitest": "5.0.3"
   }
 }

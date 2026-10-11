@@ -62,6 +62,9 @@ npm run db:start
 | `npm run db:generate` | 修改 `server/db/schema.ts` 后生成迁移文件 |
 | `npm run db:migrate` | 执行迁移 |
 | `npm run build` | 构建生产版本，输出到 `.output/` |
+| `npm test` | 单元测试：提示词拼接和防注入、分数解析、复习排期、Key 校验、SSE 解析等，不需要数据库，1 秒内跑完 |
+| `npm run test:api` | 接口测试：构建并启动真实服务，连独立的测试库 `handbook_test` 和测试里自带的模拟大模型，覆盖登录权限、单题面试、复习计划、模拟面试、按简历出题等流程。需要先 `npm run db:start`；不读写正式数据，也不影响正在运行的开发服务器 |
+| `npm run test:all` | 两类测试一起跑 |
 
 ## 目录结构
 

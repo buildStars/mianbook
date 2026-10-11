@@ -1,5 +1,5 @@
 import { and, count, eq, gte, notLike } from 'drizzle-orm'
-import type { H3Event } from 'h3'
+import { createError, getHeader, type H3Event } from 'h3'
 import { AI_HEADERS, AI_PROVIDERS } from '#shared/utils/ai-providers'
 
 export interface ChatMessage {
@@ -40,9 +40,9 @@ export function siteTarget(): AiTarget {
 }
 
 /** 用户自带 Key 时允许请求的域名：预设服务商 + .env 里 NUXT_AI_EXTRA_HOSTS 追加的 */
-export function allowedUserHosts(): string[] {
+export function allowedUserHosts(extraHosts: string[] = aiConfig().extraHosts): string[] {
   const hosts = new Set(AI_PROVIDERS.map((p) => new URL(p.baseUrl).hostname))
-  for (const h of aiConfig().extraHosts) hosts.add(h)
+  for (const h of extraHosts) hosts.add(h)
   return [...hosts]
 }
 
@@ -51,10 +51,25 @@ export function allowedUserHosts(): string[] {
  * Base URL 只能是 https 且域名在白名单里，防止借服务器去请求内网地址（SSRF）
  */
 export function userTarget(event: H3Event): AiTarget | null {
-  const apiKey = getHeader(event, AI_HEADERS.apiKey)?.trim()
+  return parseUserTarget(
+    {
+      apiKey: getHeader(event, AI_HEADERS.apiKey),
+      baseUrl: getHeader(event, AI_HEADERS.baseUrl),
+      model: getHeader(event, AI_HEADERS.model),
+    },
+    allowedUserHosts(),
+  )
+}
+
+/** 校验用户填的配置；纯函数，方便单元测试 */
+export function parseUserTarget(
+  input: { apiKey?: string; baseUrl?: string; model?: string },
+  allowedHosts: string[],
+): AiTarget | null {
+  const apiKey = input.apiKey?.trim()
   if (!apiKey) return null
-  const rawBase = getHeader(event, AI_HEADERS.baseUrl)?.trim() ?? ''
-  const model = getHeader(event, AI_HEADERS.model)?.trim() ?? ''
+  const rawBase = input.baseUrl?.trim() ?? ''
+  const model = input.model?.trim() ?? ''
 
   let url: URL
   try {
@@ -62,7 +77,7 @@ export function userTarget(event: H3Event): AiTarget | null {
   } catch {
     throw createError({ statusCode: 400, message: 'AI 设置里的 Base URL 格式不对' })
   }
-  if (url.protocol !== 'https:' || url.username || url.password || url.port || !allowedUserHosts().includes(url.hostname)) {
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || !allowedHosts.includes(url.hostname)) {
     throw createError({ statusCode: 400, message: `不支持这个 AI 服务地址：${url.host}，请从列表里选择服务商` })
   }
   if (!model || model.length > 128 || !/^[\w.:/@-]+$/.test(model)) {

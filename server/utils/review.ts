@@ -4,7 +4,8 @@ import type { ReviewGrade, StoredCard, StudyStatus } from '#shared/types/handboo
 
 /**
  * 间隔重复调度器（FSRS）。面试题的复习以天为单位就够了，所以关掉分钟级的学习步骤；
- * 准备面试的周期一般是几个月，最长间隔限制在 120 天
+ * 准备面试的周期一般是几个月，最长间隔限制在 120 天左右
+ * （ts-fsrs 会保证四档评分的间隔依次拉开，所以"会了""很熟"最多比上限多一两天）
  */
 const scheduler = fsrs({ enable_short_term: false, maximum_interval: 120 })
 

@@ -16,7 +16,7 @@ export default defineEventHandler(async (event): Promise<Record<number, Category
       .select({ questionId: tables.interviews.questionId, turns: tables.interviews.turns })
       .from(tables.interviews)
       .where(eq(tables.interviews.userId, user.id))
-      .orderBy(desc(tables.interviews.updatedAt)),
+      .orderBy(desc(tables.interviews.updatedAt), desc(tables.interviews.id)),
     db
       .select({ questionId: tables.reviewCards.questionId })
       .from(tables.reviewCards)

@@ -6,6 +6,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   devtools: { enabled: false },
 
+  // 接口测试单独构建到 .nuxt-test / .output-test，避免覆盖正在运行的开发服务器
+  ...(process.env.HANDBOOK_TEST_BUILD ? { buildDir: '.nuxt-test', nitro: { output: { dir: '.output-test' } } } : {}),
+
   modules: ['@nuxtjs/color-mode', '@element-plus/nuxt', 'nuxt-auth-utils'],
 
   // 标题用思源宋体（可变字重），按字符分片自托管，浏览器只下载页面用到的分片

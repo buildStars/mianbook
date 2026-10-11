@@ -8,7 +8,7 @@ export default defineEventHandler(async (event): Promise<MockSessionSummary[]> =
     .select()
     .from(tables.mockSessions)
     .where(eq(tables.mockSessions.userId, user.id))
-    .orderBy(desc(tables.mockSessions.createdAt))
+    .orderBy(desc(tables.mockSessions.createdAt), desc(tables.mockSessions.id))
     .limit(30)
   return rows.map(toSummary)
 })

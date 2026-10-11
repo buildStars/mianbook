@@ -1,0 +1,115 @@
+/**
+ * 测试用的模拟大模型：实现 OpenAI 兼容的 /chat/completions（流式和非流式）和 /models。
+ * 约定：
+ * - Authorization 必须是 Bearer mock-key，否则返回 401
+ * - 回答里写 [score=N] 时返回 N 分，否则 6 分；写 [upstream-error] 时返回 500
+ * - 系统提示里有"面试总结"时返回总结，有"项目深挖题"且非流式时返回出题 JSON
+ * - 流式输出故意切成小块，并把一条 data 拆在两次写入里，测试服务端的拼接
+ */
+import http from 'node:http'
+import type { AddressInfo } from 'node:net'
+
+export const MOCK_KEY = 'mock-key'
+
+export interface MockLlm {
+  url: string
+  /** 最近一次 /chat/completions 请求体 */
+  last: () => any
+  close: () => Promise<void>
+}
+
+function feedback(user: string): string {
+  // 只看本轮回答：提示词里的"之前的问答"也可能带着 [score=N]
+  const current = user.split('【本轮回答】').at(-1) ?? user
+  const score = Number(current.match(/\[score=(\d+)\]/)?.[1] ?? 6)
+  const lastRound = user.includes('这是最后一轮')
+  return [
+    `得分：${score}/10`,
+    '### 答对的点',
+    '- 讲到了主要流程',
+    '### 遗漏或不准确',
+    '- 没有讲清楚取舍',
+    '### 改进建议',
+    '先讲结论，再讲原理。',
+    '### 追问',
+    lastRound ? '无' : '如果数据量再大十倍，你会怎么改？',
+  ].join('\n')
+}
+
+const REPORT = '### 总体评价\n基础尚可，原理不够深入。\n### 做得好的地方\n- 第 1 题思路清楚\n### 主要问题\n- 取舍讲得不清楚\n### 复习建议\n- 复习相关原理'
+
+const RESUME = {
+  questions: [
+    { title: '介绍一下你负责的直播项目和整体架构', points: ['业务背景', '个人职责', '整体架构'] },
+    { title: '弹幕高峰时怎么削峰限流？为什么这样选型？', points: ['峰值和瓶颈', '限流位置和算法', '选型取舍'] },
+    { title: '首屏优化具体做了什么？怎么量化效果？', points: ['定位手段', '优化项', '指标'] },
+    { title: '如果重做这个项目，你会改哪里？', points: ['反思是否具体'] },
+  ],
+  categories: ['basics/redis', 'basics/vue', 'not/exist'],
+}
+
+export async function startMockLlm(): Promise<MockLlm> {
+  let lastBody: any = null
+  const server = http.createServer(async (req, res) => {
+    // 测试代码跑在别的进程里，通过这个地址查看服务端最近发给模型的内容
+    if (req.url === '/__last') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(lastBody))
+      return
+    }
+    if (req.headers.authorization !== `Bearer ${MOCK_KEY}`) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'Invalid Authentication' } }))
+      return
+    }
+    if (req.url === '/v1/models') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ data: [{ id: 'mock-model' }] }))
+      return
+    }
+    if (req.url !== '/v1/chat/completions' || req.method !== 'POST') {
+      res.writeHead(404)
+      res.end()
+      return
+    }
+
+    let raw = ''
+    for await (const chunk of req) raw += chunk
+    const body = JSON.parse(raw)
+    lastBody = body
+    const system: string = body.messages[0].content
+    const user: string = body.messages.at(-1).content
+
+    if (user.includes('[upstream-error]')) {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'boom' } }))
+      return
+    }
+    if (body.stream === false) {
+      const content = system.includes('项目深挖题') ? `好的：\n\`\`\`json\n${JSON.stringify(RESUME)}\n\`\`\`` : '好'
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 20 } }))
+      return
+    }
+
+    const text = system.includes('面试总结') ? REPORT : feedback(user)
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
+    for (const piece of text.match(/[\s\S]{1,12}/g) ?? []) {
+      if (res.destroyed) return
+      const line = `data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`
+      const mid = Math.floor(line.length / 2)
+      res.write(line.slice(0, mid))
+      res.write(line.slice(mid))
+    }
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: {} }], usage: { prompt_tokens: 500, completion_tokens: 100 } })}\n\n`)
+    res.end('data: [DONE]\n\n')
+  })
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address() as AddressInfo
+  return {
+    url: `http://127.0.0.1:${port}/v1`,
+    last: () => lastBody,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  }
+}
