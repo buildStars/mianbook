@@ -15,11 +15,13 @@ export default defineEventHandler(async (event) => {
   const context = await authoringContext(body.categoryId)
 
   let text: string
+  const call = startAiCall(admin.id, 'author', ai.target)
   try {
     const result = await chatOnce(ai.target, buildTopicMessages({ context, count: body.count, hint: body.hint }), { maxTokens: 1500 })
     text = result.text
-    await recordAiCall(admin.id, 'author', ai.ownKey, result.usage)
+    await call.finish({ usage: result.usage, produced: true })
   } catch (error) {
+    await call.finish({ error, produced: false })
     throw createError({ statusCode: 502, message: describeAiError(error, ai.target) })
   }
 

@@ -2,6 +2,19 @@
 
 export type AiKind = 'interview' | 'report' | 'resume' | 'author' | 'ask' | 'agent'
 
+/** 某个功能的 AI 调用性能（近 7 天）；延迟单位毫秒，只统计正常结束的调用 */
+export interface AiPerfRow {
+  kind: AiKind | 'all'
+  calls: number
+  errors: number
+  aborted: number
+  errorRate: number
+  ttftP50: number | null
+  ttftP95: number | null
+  latencyP50: number | null
+  latencyP95: number | null
+}
+
 export interface DashboardQuestionRef {
   id: number
   title: string
@@ -66,6 +79,18 @@ export interface AdminDashboard {
   }
   /** 需要处理的事项 */
   alerts: { level: 'warn' | 'info'; text: string; to?: string; action?: string }[]
+  /** AI 调用的延迟和出错率（近 7 天） */
+  perf: {
+    byKind: AiPerfRow[]
+    overall: AiPerfRow
+    /** 最近几次出错的 AI 调用 */
+    recentErrors: { kind: string; model: string | null; error: string; at: string }[]
+  }
+  /** 服务端 5xx 错误 */
+  errors: {
+    count7d: number
+    recent: { message: string; path: string | null; method: string | null; statusCode: number; at: string }[]
+  }
 }
 
 export interface QuestionVersionSummary {

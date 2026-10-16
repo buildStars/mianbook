@@ -11,6 +11,7 @@
     "db:init": "node scripts/mysql.mjs init",
     "db:start": "node scripts/mysql.mjs start",
     "eval:retrieval": "tsx scripts/eval-retrieval.ts",
+    "eval:scoring": "tsx scripts/eval-scoring.ts",
     "db:stop": "node scripts/mysql.mjs stop",
     "db:status": "node scripts/mysql.mjs status",
     "db:generate": "drizzle-kit generate",

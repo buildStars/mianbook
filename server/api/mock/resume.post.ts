@@ -19,25 +19,24 @@ const schema = z.object({
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const body = await readValidated(event, schema)
-  const { target, ownKey } = await resolveAi(event, user.id)
+  const { target } = await resolveAi(event, user.id)
 
   const outline = await getOutline()
   const categories = outline.flatMap((p) => p.categories.map((c) => ({ key: `${p.slug}/${c.slug}`, title: c.title, id: c.id })))
 
   let parsed: ReturnType<typeof parseResumeQuestions> = null
-  let usage
+  const call = startAiCall(user.id, 'resume', target)
   try {
     const result = await chatOnce(
       target,
       buildResumeMessages({ resume: body.resume, role: body.role, count: body.projectCount, categories }),
       { maxTokens: 3000 },
     )
-    usage = result.usage
     parsed = parseResumeQuestions(result.text)
+    await call.finish({ usage: result.usage, produced: true, error: parsed ? undefined : new AiError(502, '没有按格式出题') })
   } catch (error) {
+    await call.finish({ error, produced: false })
     throw createError({ statusCode: 502, message: describeAiError(error, target) })
-  } finally {
-    await recordAiCall(user.id, 'resume', ownKey, usage)
   }
   if (!parsed) throw createError({ statusCode: 502, message: 'AI 没有按格式出题，请重试一次' })
 

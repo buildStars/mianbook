@@ -20,7 +20,7 @@ const NO_HIT = '手册里没有找到和这个问题相关的内容。可以换�
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const body = await readValidated(event, schema)
-  const { target, ownKey, remaining } = await resolveAi(event, user.id)
+  const { target, remaining } = await resolveAi(event, user.id)
 
   const found = await searchHandbook(retrievalQuery(body.question, body.history), { limit: 6, perQuestion: 2 })
   const sources = found.hits.map((h, i) => ({
@@ -41,6 +41,9 @@ export default defineEventHandler(async (event) => {
   ;(async () => {
     let text = ''
     let usage: ChatUsage | undefined
+    let failure: unknown
+    // 没检索到资料时不调用模型，也就不记录
+    let call: ReturnType<typeof startAiCall> | null = null
     try {
       await send('sources', { sources } satisfies AskSourcesEvent)
       // 一段资料都没找到时不调用大模型，也不占次数
@@ -54,8 +57,10 @@ export default defineEventHandler(async (event) => {
         history: body.history,
         sources: found.hits.map((h, i) => ({ n: i + 1, title: h.chunk.title, heading: h.chunk.heading, text: h.chunk.text })),
       })
+      call = startAiCall(user.id, 'ask', target)
       for await (const part of streamChat(target, messages, controller.signal, { maxTokens: 1200 })) {
         if (part.delta) {
+          call.firstToken()
           text += part.delta
           await send('delta', { text: part.delta })
         }
@@ -64,9 +69,10 @@ export default defineEventHandler(async (event) => {
       if (!text.trim()) throw new AiError(502, 'AI 没有返回内容，请重试')
       await send('done', { citations: extractCitations(text, sources.length), remaining } satisfies AskDoneEvent)
     } catch (error) {
+      failure = error
       if (!controller.signal.aborted) await send('error', { message: describeAiError(error, target) })
     } finally {
-      if (text) await recordAiCall(user.id, 'ask', ownKey, usage)
+      await call?.finish({ usage, error: failure, aborted: controller.signal.aborted, produced: Boolean(text) })
       await stream.close()
     }
   })()

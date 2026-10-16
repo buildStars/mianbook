@@ -1,4 +1,4 @@
-import { and, avg, count, countDistinct, desc, eq, gte, inArray, isNotNull, sql, sum, type SQL } from 'drizzle-orm'
+import { and, avg, count, countDistinct, desc, eq, gte, inArray, isNotNull, ne, sql, sum, type SQL } from 'drizzle-orm'
 import type { AnyMySqlColumn } from 'drizzle-orm/mysql-core'
 import { z } from 'zod'
 import type { AdminDashboard, AiKind, DashboardQuestionRef } from '#shared/types/admin'
@@ -73,7 +73,8 @@ export default defineEventHandler(async (event): Promise<AdminDashboard> => {
         untracked: sql<number>`sum(${t.aiCalls.promptTokens} is null)`.mapWith(Number),
       })
       .from(t.aiCalls)
-      .where(gte(t.aiCalls.createdAt, since14))
+      // 出错的调用不算用量（也不扣次数），在下面的性能统计里单独看
+      .where(and(gte(t.aiCalls.createdAt, since14), ne(t.aiCalls.status, 'error')))
       .groupBy(aiDay, t.aiCalls.kind),
     Promise.all([
       db.selectDistinct(active[0]!.fields).from(t.events).where(active[0]!.where),
@@ -209,7 +210,37 @@ export default defineEventHandler(async (event): Promise<AdminDashboard> => {
     alerts.push({ level: 'info', text: '填写模型价格后，可以估算站点 Key 的花费', to: '/admin/ai', action: '填写价格' })
   }
 
+  // AI 调用的延迟和出错率、最近的错误（近 7 天）
+  const [perfRows, aiErrors, errorTotal, errorRows] = await Promise.all([
+    db
+      .select({ kind: t.aiCalls.kind, status: t.aiCalls.status, ttftMs: t.aiCalls.ttftMs, latencyMs: t.aiCalls.latencyMs })
+      .from(t.aiCalls)
+      .where(gte(t.aiCalls.createdAt, since7))
+      .orderBy(desc(t.aiCalls.id))
+      .limit(20_000),
+    db
+      .select({ kind: t.aiCalls.kind, model: t.aiCalls.model, error: t.aiCalls.error, at: t.aiCalls.createdAt })
+      .from(t.aiCalls)
+      .where(and(eq(t.aiCalls.status, 'error'), gte(t.aiCalls.createdAt, since7)))
+      .orderBy(desc(t.aiCalls.id))
+      .limit(5),
+    db.select({ total: count() }).from(t.errorLogs).where(gte(t.errorLogs.createdAt, since7)),
+    db
+      .select({ message: t.errorLogs.message, path: t.errorLogs.path, method: t.errorLogs.method, statusCode: t.errorLogs.statusCode, at: t.errorLogs.createdAt })
+      .from(t.errorLogs)
+      .orderBy(desc(t.errorLogs.id))
+      .limit(8),
+  ])
+
   return {
+    perf: {
+      ...aiPerformance(perfRows, KINDS),
+      recentErrors: aiErrors.map((r) => ({ kind: r.kind, model: r.model, error: r.error ?? '', at: r.at.toISOString() })),
+    },
+    errors: {
+      count7d: errorTotal[0]?.total ?? 0,
+      recent: errorRows.map((r) => ({ ...r, at: r.at.toISOString() })),
+    },
     days,
     ai: {
       configured: Boolean(apiKey),

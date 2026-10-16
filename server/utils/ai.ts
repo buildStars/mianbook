@@ -3,6 +3,7 @@ import { createError, getHeader, type H3Event } from 'h3'
 import { AI_HEADERS, AI_PROVIDERS } from '#shared/utils/ai-providers'
 import type { AiKind } from '#shared/types/admin'
 import type { AgentMessage, ToolCall } from '#shared/types/agent'
+import { PROMPT_VERSIONS } from '#shared/utils/prompt-versions'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -119,6 +120,8 @@ export async function aiUsageToday(userId: number): Promise<number> {
         eq(tables.aiCalls.userId, userId),
         notLike(tables.aiCalls.kind, '%-own'),
         ne(tables.aiCalls.kind, 'author'),
+        // 出错的调用不扣次数
+        ne(tables.aiCalls.status, 'error'),
         gte(tables.aiCalls.createdAt, since),
       ),
     )
@@ -322,17 +325,50 @@ export async function resolveAi(event: H3Event, userId: number) {
   return { target, ownKey, remaining }
 }
 
-/** 记一次大模型调用；用自己 Key 的记成 xxx-own，不占站点的每日次数 */
-export function recordAiCall(userId: number, kind: AiKind, ownKey: boolean, usage?: ChatUsage) {
-  return useDb()
-    .insert(tables.aiCalls)
-    .values({
-      userId,
-      kind: ownKey ? `${kind}-own` : kind,
-      promptTokens: usage?.prompt_tokens ?? null,
-      completionTokens: usage?.completion_tokens ?? null,
-    })
-    .catch(() => {})
+export interface AiCallOutcome {
+  usage?: ChatUsage
+  error?: unknown
+  /** 用户中途停止（关闭页面、点停止） */
+  aborted?: boolean
+  /** 模型有没有输出过内容 */
+  produced: boolean
+}
+
+const errorSummary = (error: unknown) =>
+  (error instanceof AiError ? `${error.status} ${error.message}` : error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 255)
+
+/**
+ * 开始记录一次大模型调用（Agent 的一轮算一次）：首字延迟、总耗时、模型、提示词版本和结果。
+ * 用自己 Key 的记成 xxx-own，不占站点的每日次数；出错的不占次数；中途停止且还没有任何输出的不记
+ */
+export function startAiCall(userId: number, kind: AiKind, target: AiTarget) {
+  const started = performance.now()
+  let ttft: number | null = null
+  return {
+    /** 收到第一段输出时调用 */
+    firstToken() {
+      ttft ??= Math.round(performance.now() - started)
+    },
+    finish({ usage, error, aborted, produced }: AiCallOutcome) {
+      if (aborted && !produced) return Promise.resolve()
+      return useDb()
+        .insert(tables.aiCalls)
+        .values({
+          userId,
+          kind: target.source === 'user' ? `${kind}-own` : kind,
+          promptTokens: usage?.prompt_tokens ?? null,
+          completionTokens: usage?.completion_tokens ?? null,
+          model: target.model.slice(0, 128) || null,
+          promptVersion: PROMPT_VERSIONS[kind],
+          ttftMs: ttft,
+          latencyMs: Math.round(performance.now() - started),
+          status: aborted ? 'aborted' : error ? 'error' : 'ok',
+          error: error && !aborted ? errorSummary(error) : null,
+        })
+        .then(() => {})
+        .catch(() => {})
+    },
+  }
 }
 
 /** 非流式调用一次，返回完整文本；用于出题这类不需要边生成边显示的场景 */

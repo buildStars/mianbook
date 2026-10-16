@@ -64,6 +64,13 @@
       "when": 1792166815000,
       "tag": "0008_login_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1792167577543,
+      "tag": "0009_observability",
+      "breakpoints": true
     }
   ]
 }

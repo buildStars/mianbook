@@ -278,7 +278,9 @@ export async function startMockLlm(): Promise<MockLlm> {
         ? `好的：\n\`\`\`json\n${JSON.stringify(RESUME)}\n\`\`\``
         : system.includes('规划选题')
           ? TOPICS
-          : '好'
+          : system.includes('得分：X/10')
+            ? feedback(user) // 打分评测脚本用非流式调用面试官
+            : '好'
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 20 } }))
       return

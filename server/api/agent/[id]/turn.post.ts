@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const body = await readValidated(event, schema)
   const row = await getAgentSession(user.id, id)
   const turn = turnMessage(row, body)
-  const { target, ownKey, remaining } = await resolveAi(event, user.id)
+  const { target, remaining } = await resolveAi(event, user.id)
 
   const stream = createEventStream(event)
   const controller = new AbortController()
@@ -26,6 +26,8 @@ export default defineEventHandler(async (event) => {
   ;(async () => {
     let produced = false
     let usage: ChatUsage | undefined
+    let failure: unknown
+    const call = startAiCall(user.id, 'agent', target)
     try {
       const result = await runAgentTurn({
         row: { ...row, state: turn.state },
@@ -33,19 +35,27 @@ export default defineEventHandler(async (event) => {
         pendingAnswer: turn.pendingAnswer,
         target,
         signal: controller.signal,
-        emit: send,
+        // 第一段文字或第一个工具调用就算首字
+        emit: (name, data) => {
+          if (name === 'delta' || name === 'tool_start') {
+            produced = true
+            call.firstToken()
+          }
+          return send(name, data)
+        },
       })
-      produced = result.produced
       usage = result.usage
       await send('done', { finished: result.finished, truncated: result.truncated, remaining })
     } catch (error) {
+      failure = error
       if (!controller.signal.aborted) {
         const message = error instanceof Error && 'statusCode' in error ? error.message : describeAiError(error, target)
         await send('error', { message })
       }
     } finally {
-      // 一轮里不管调了几次模型，都只算一次
-      if (produced) await recordAiCall(user.id, 'agent', ownKey, usage)
+      // 一轮里不管调了几次模型，都只记一次；还没调用模型就被拒绝的（比如上一轮还没结束）不记
+      const rejected = !produced && failure instanceof Error && 'statusCode' in failure
+      if (!rejected) await call.finish({ usage, error: failure, aborted: controller.signal.aborted, produced })
       await stream.close()
     }
   })()

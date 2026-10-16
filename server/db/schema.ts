@@ -193,6 +193,14 @@ export const aiCalls = mysqlTable(
     kind: varchar('kind', { length: 32 }).notNull(),
     promptTokens: int('prompt_tokens'),
     completionTokens: int('completion_tokens'),
+    /** 可观测：用的哪个模型、哪一版提示词、首字延迟和总耗时（毫秒）、结果 */
+    model: varchar('model', { length: 128 }),
+    promptVersion: varchar('prompt_version', { length: 32 }),
+    ttftMs: int('ttft_ms'),
+    latencyMs: int('latency_ms'),
+    /** ok 正常结束；aborted 用户中途停止（已经产生了输出，计入次数）；error 出错（不计入次数） */
+    status: mysqlEnum('status', ['ok', 'aborted', 'error']).notNull().default('ok'),
+    error: varchar('error', { length: 255 }),
     createdAt: createdAt(),
   },
   (t) => [index('ai_calls_user_created_idx').on(t.userId, t.createdAt)],
@@ -368,4 +376,19 @@ export const failedLogins = mysqlTable(
     createdAt: createdAt(),
   },
   (t) => [index('failed_logins_email_idx').on(t.email, t.createdAt), index('failed_logins_ip_idx').on(t.ip, t.createdAt)],
+)
+
+/** 服务端错误：接口抛出的 5xx 错误记一条，后台概览里能看到最近的错误。保留 30 天 */
+export const errorLogs = mysqlTable(
+  'error_logs',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    message: varchar('message', { length: 500 }).notNull(),
+    stack: text('stack'),
+    method: varchar('method', { length: 8 }),
+    path: varchar('path', { length: 255 }),
+    statusCode: int('status_code').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('error_logs_created_idx').on(t.createdAt)],
 )

@@ -73,9 +73,12 @@ export function streamAuthoring(event: H3Event, userId: number, ai: ReturnType<t
   ;(async () => {
     let text = ''
     let usage: ChatUsage | undefined
+    let failure: unknown
+    const call = startAiCall(userId, 'author', ai.target)
     try {
       for await (const part of streamChat(ai.target, messages, controller.signal, { maxTokens: 8192, timeoutMs: 300_000 })) {
         if (part.delta) {
+          call.firstToken()
           text += part.delta
           await send('delta', { text: part.delta })
         }
@@ -84,9 +87,10 @@ export function streamAuthoring(event: H3Event, userId: number, ai: ReturnType<t
       if (!text.trim()) throw new AiError(502, 'AI 没有返回内容，请重试')
       await send('done', { length: text.length })
     } catch (error) {
+      failure = error
       if (!controller.signal.aborted) await send('error', { message: describeAiError(error, ai.target) })
     } finally {
-      if (text) await recordAiCall(userId, 'author', ai.ownKey, usage)
+      await call.finish({ usage, error: failure, aborted: controller.signal.aborted, produced: Boolean(text) })
       await stream.close()
     }
   })()

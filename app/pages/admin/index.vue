@@ -43,6 +43,9 @@ const aiTrend = computed(() => {
 const KIND_LABELS = { interview: 'AI 单题面试', agent: 'Agent 面试', ask: '问手册', report: '模拟面试总结', resume: '简历出题', author: '后台 AI 写题' } as const
 const kindMax = computed(() => Math.max(1, ...(data.value?.ai.byKind ?? []).map((k) => k.site + k.own)))
 
+const ms = (v: number | null) => (v === null ? '—' : v < 1000 ? `${v}ms` : `${(v / 1000).toFixed(1)}s`)
+const kindLabel = (kind: string) => KIND_LABELS[kind.replace(/-own$/, '') as keyof typeof KIND_LABELS] ?? kind
+
 const money = (c: { amount: number; currency: 'CNY' | 'USD' }) => `${c.currency === 'CNY' ? '¥' : '$'}${c.amount.toFixed(2)}`
 
 const mockRate = computed(() => {
@@ -143,6 +146,62 @@ const editLink = (id: number) => `/admin/questions/${id}`
                   <i class="own" :style="{ width: `${(k.own / kindMax) * 100}%` }" />
                 </div>
                 <p class="kind-sub">站点 {{ k.site }} · 自带 {{ k.own }}</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI 性能和错误 -->
+      <section class="row two">
+        <div class="a-card">
+          <div class="a-card-head">
+            <h2>AI 性能</h2>
+            <span class="aside">近 7 天 · 延迟只算正常结束的调用</span>
+          </div>
+          <div class="a-card-body">
+            <p v-if="!data.perf.byKind.length" class="a-empty">最近 7 天没有 AI 调用</p>
+            <div v-else class="perf-wrap">
+              <table class="perf">
+                <thead>
+                  <tr>
+                    <th>功能</th>
+                    <th class="n">调用</th>
+                    <th class="n">出错率</th>
+                    <th class="n" title="收到第一段输出的时间">首字 P50 / P95</th>
+                    <th class="n">总耗时 P50 / P95</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in [...data.perf.byKind, data.perf.overall]" :key="r.kind" :class="{ total: r.kind === 'all' }">
+                    <td>{{ r.kind === 'all' ? '全部' : KIND_LABELS[r.kind] }}</td>
+                    <td class="n a-num">{{ r.calls }}</td>
+                    <td class="n a-num" :class="{ bad: r.errorRate >= 0.05 }">{{ (r.errorRate * 100).toFixed(1) }}%</td>
+                    <td class="n a-mono">{{ ms(r.ttftP50) }} / {{ ms(r.ttftP95) }}</td>
+                    <td class="n a-mono">{{ ms(r.latencyP50) }} / {{ ms(r.latencyP95) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <ul v-if="data.perf.recentErrors.length" class="err-list">
+              <li v-for="(e, i) in data.perf.recentErrors" :key="i">
+                <span class="err-meta">{{ formatDateTime(e.at) }} · {{ kindLabel(e.kind) }}{{ e.model ? ` · ${e.model}` : '' }}</span>
+                <span class="err-msg">{{ e.error }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="a-card">
+          <div class="a-card-head">
+            <h2>服务端错误</h2>
+            <span class="aside">近 7 天 {{ data.errors.count7d }} 条 · 同样的错误一分钟只记一次</span>
+          </div>
+          <div class="a-card-body">
+            <p v-if="!data.errors.recent.length" class="a-empty">没有 5xx 错误</p>
+            <ul v-else class="err-list">
+              <li v-for="(e, i) in data.errors.recent" :key="i">
+                <span class="err-meta">{{ formatDateTime(e.at) }} · {{ e.statusCode }} · {{ e.method }} {{ e.path }}</span>
+                <span class="err-msg">{{ e.message }}</span>
               </li>
             </ul>
           </div>
@@ -260,6 +319,75 @@ const editLink = (id: number) => `/admin/questions/${id}`
 </template>
 
 <style scoped>
+.perf-wrap {
+  overflow-x: auto;
+}
+
+.perf {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.perf th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--c-divider);
+  color: var(--c-text-3);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.perf td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--c-divider);
+  white-space: nowrap;
+}
+
+.perf .n {
+  text-align: right;
+}
+
+.perf tr.total td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.perf .bad {
+  color: var(--c-danger);
+}
+
+.err-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.err-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--c-danger-soft);
+  min-width: 0;
+}
+
+.err-meta {
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+.err-msg {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-danger);
+  overflow-wrap: anywhere;
+}
+
 .dash {
   display: flex;
   flex-direction: column;

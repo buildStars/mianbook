@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   if (row.status !== 'finished') throw createError({ statusCode: 400, message: '面试结束后才能生成总结' })
   if (!row.items.some((i) => i.done)) throw createError({ statusCode: 400, message: '这场面试没有作答的题，无法生成总结' })
 
-  const { target, ownKey, remaining } = await resolveAi(event, user.id)
+  const { target, remaining } = await resolveAi(event, user.id)
   const detail = await sessionDetail(row)
   const messages = buildReportMessages({
     track: detail.title,
@@ -32,9 +32,12 @@ export default defineEventHandler(async (event) => {
   ;(async () => {
     let text = ''
     let usage: ChatUsage | undefined
+    let failure: unknown
+    const call = startAiCall(user.id, 'report', target)
     try {
       for await (const part of streamChat(target, messages, controller.signal)) {
         if (part.delta) {
+          call.firstToken()
           text += part.delta
           await send('delta', { text: part.delta })
         }
@@ -44,9 +47,10 @@ export default defineEventHandler(async (event) => {
       await useDb().update(tables.mockSessions).set({ report: text }).where(eq(tables.mockSessions.id, row.id))
       await send('done', { remaining })
     } catch (error) {
+      failure = error
       if (!controller.signal.aborted) await send('error', { message: describeAiError(error, target) })
     } finally {
-      if (text) await recordAiCall(user.id, 'report', ownKey, usage)
+      await call.finish({ usage, error: failure, aborted: controller.signal.aborted, produced: Boolean(text) })
       await stream.close()
     }
   })()

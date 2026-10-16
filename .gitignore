@@ -24,3 +24,6 @@ Thumbs.db
 
 # Claude Code 的个人设置
 .claude/settings.local.json
+
+# 评测结果（每次运行生成）
+evals/results/

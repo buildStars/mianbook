@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: '缺少题目' })
   }
 
-  const { target, ownKey, remaining } = await resolveAi(event, user.id)
+  const { target, remaining } = await resolveAi(event, user.id)
 
   // 题目：题库里的题读参考答案；按简历生成的题用考察要点代替参考答案
   let question: { id: number; title: string; contentMd: string } | undefined
@@ -94,9 +94,12 @@ export default defineEventHandler(async (event) => {
   ;(async () => {
     let text = ''
     let usage: ChatUsage | undefined
+    let failure: unknown
+    const call = startAiCall(user.id, 'interview', target)
     try {
       for await (const part of streamChat(target, messages, controller.signal)) {
         if (part.delta) {
+          call.firstToken()
           text += part.delta
           await send('delta', { text: part.delta })
         }
@@ -160,10 +163,11 @@ export default defineEventHandler(async (event) => {
 
       await send('done', { interviewId, round, score, followUp, finished, studyStatus, remaining })
     } catch (error) {
+      failure = error
       if (!controller.signal.aborted) await send('error', { message: describeAiError(error, target) })
     } finally {
-      // 只要大模型已经开始输出，就算一次调用（中途停止也消耗了 token）
-      if (text) await recordAiCall(user.id, 'interview', ownKey, usage)
+      // 大模型已经开始输出时，中途停止也算一次（消耗了 token）；出错的不算
+      await call.finish({ usage, error: failure, aborted: controller.signal.aborted, produced: Boolean(text) })
       await stream.close()
     }
   })()
