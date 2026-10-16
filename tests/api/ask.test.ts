@@ -107,6 +107,78 @@ describe('问手册的检索索引', () => {
       await mock('/__embed-down?on=0')
     }
   })
+
+  // 每个测试用不同的问题：同一个问题、同一批候选重排过一次后会用缓存
+  const debugSearch = async (q: string, extra = '') => (await c.json(`/api/admin/rag/search?q=${encodeURIComponent(q)}${extra}`)).data
+  const key = (h: any) => `${h.questionId}/${h.heading}/${h.snippet.slice(0, 20)}`
+  const reranks = async () => (await (await mock('/__reranks')).json()) as { calls: number; last: any }
+
+  it('重排：融合排序的前 30 块交给重排模型，后台能看到每块重排前排第几；同一个问题再查用缓存', async () => {
+    // 前面的测试查过"缓存穿透 布隆过滤器"，分数已经缓存了，这里换一个问题
+    const q = '缓存穿透 缓存空值 布隆过滤器'
+    const fused = await debugSearch(q, '&rerank=0')
+    expect(fused.rerank).toBeNull()
+    expect(fused.hits.every((h: any) => h.rerankScore === null && h.fusedRank === h.rank)).toBe(true)
+
+    // 模拟的重排模型默认保持原来的顺序：结果和融合排序一样，只是多了分数
+    const before = (await reranks()).calls
+    const same = await debugSearch(q)
+    expect(same.rerank).toMatchObject({ model: 'mock-rerank', applied: true, cached: false, error: null })
+    expect(same.rerank.candidates).toBeGreaterThan(fused.hits.length)
+    expect(same.rerank.candidates).toBeLessThanOrEqual(30)
+    expect(same.hits.map(key)).toEqual(fused.hits.map(key))
+    expect(same.hits.every((h: any) => typeof h.rerankScore === 'number')).toBe(true)
+    const { calls, last } = await reranks()
+    expect(calls - before).toBe(1)
+    expect(last).toMatchObject({ query: q, model: 'mock-rerank', documents: same.rerank.candidates, topN: same.rerank.candidates })
+
+    const again = await debugSearch(q)
+    expect(again.rerank).toMatchObject({ applied: true, cached: true })
+    expect(again.hits.map(key)).toEqual(same.hits.map(key))
+    expect((await reranks()).calls).toBe(calls)
+  })
+
+  it('重排模型把融合排序第 10 的块排第一时，再和融合排序做 RRF，它排到第 5', async () => {
+    const q = '布隆过滤器 缓存穿透 怎么解决'
+    const fused = await debugSearch(q, '&rerank=0')
+    const target = fused.hits.at(-1)
+    await mock(`/__rerank-boost?query=${encodeURIComponent(q)}&text=${encodeURIComponent(target.snippet.slice(0, 40))}`)
+    try {
+      const boosted = await debugSearch(q)
+      expect(boosted.rerank).toMatchObject({ applied: true, cached: false })
+      // 它的分数 1/70 + 1/61，比融合排序第 4 块（1/64 + 1/65）低，比第 5 块（1/65 + 1/66）高
+      expect(boosted.hits[4]).toMatchObject({ rank: 5, fusedRank: 10 })
+      expect(boosted.hits.map(key)).toEqual([...fused.hits.slice(0, 4), target, ...fused.hits.slice(4, 9)].map(key))
+      expect(boosted.hits[4].rerankScore).toBeGreaterThan(boosted.hits[0].rerankScore)
+    } finally {
+      await mock('/__rerank-boost')
+    }
+  })
+
+  // 放在最后：出错后服务端会暂停重排 30 秒，模拟的重排模型不改变顺序，所以不影响后面的测试
+  it('重排接口出错时用融合排序，接下来 30 秒内先不调用', async () => {
+    const q = '缓存雪崩 过期时间加随机值'
+    const fused = await debugSearch(q, '&rerank=0')
+    await mock('/__rerank-down?on=1')
+    try {
+      const first = await debugSearch(q)
+      expect(first.rerank).toMatchObject({ applied: false })
+      expect(first.rerank.error).toContain('500')
+      expect(first.hits.map(key)).toEqual(fused.hits.map(key))
+
+      const before = (await reranks()).calls
+      const second = await debugSearch(q)
+      expect(second.rerank.applied).toBe(false)
+      expect(second.rerank.error).toContain('秒后再试')
+      expect((await reranks()).calls).toBe(before)
+
+      const status = (await c.json('/api/admin/rag')).data
+      expect(status.rerank).toMatchObject({ model: 'mock-rerank', candidates: 30 })
+      expect(status.rerank.lastError.message).toContain('500')
+    } finally {
+      await mock('/__rerank-down?on=0')
+    }
+  })
 })
 
 describe('问手册', () => {

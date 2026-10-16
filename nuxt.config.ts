@@ -74,6 +74,16 @@ export default defineNuxtConfig({
       // 每次请求送几段文本
       batchSize: 16,
     },
+    // 问手册的重排模型：混合检索取出的前 candidates 块交给它，按和问题的相关度重新排序（/rerank 接口，硅基流动、Jina、Cohere 通用）。
+    // 接口地址和 Key 留空时沿用上面 embed 的；model 设为空字符串关闭重排。超时或出错时用融合排序，不影响回答
+    rerank: {
+      baseUrl: '',
+      apiKey: '',
+      model: 'BAAI/bge-reranker-v2-m3',
+      // 候选越多越可能把排在后面的正确资料捞回来，耗时和 token 也越多
+      candidates: 30,
+      timeoutMs: 3000,
+    },
     // 发信（注册验证码）：SMTP 配置，例如 QQ 邮箱 smtp.qq.com、465 端口、授权码。
     // 云服务器一般封了 25 端口，要用 465（SSL）或 587。outboxDir 设置后不真正发信，而是把邮件写成文件，用于本地开发和测试
     mail: {

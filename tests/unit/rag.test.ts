@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  applyRerank,
   bufferToVector,
   buildRetriever,
   chunkQuestion,
   cleanMarkdown,
   embedInput,
+  fuseRerank,
   normalizeVector,
   rankQuestions,
+  rerankDocuments,
+  rerankTexts,
   retrieve,
   rrf,
   scoreRankings,
@@ -14,6 +18,7 @@ import {
   tokenizeSearchText,
   vectorToBuffer,
   type IndexedChunk,
+  type RetrievalHit,
 } from '../../server/utils/rag-core'
 import { buildAskMessages, extractCitations, retrievalQuery } from '../../server/utils/ask'
 
@@ -160,6 +165,9 @@ describe('检索', () => {
     expect(semantic.keywordRank).toBeNull()
     expect(semantic.vectorRank).toBe(2)
     expect(rankQuestions(hybrid.hits).slice(0, 2)).toEqual([1, 2])
+    // 记下融合排序里的排名，重排后对照用
+    expect(hybrid.hits.map((h) => h.fusedRank)).toEqual(hybrid.hits.map((_, i) => i + 1))
+    expect(hybrid.hits.every((h) => h.rerankScore === null)).toBe(true)
 
     // 没有问题向量时只用关键词
     const keyword = retrieve(r, 'Redis 布隆过滤器', null)
@@ -172,6 +180,88 @@ describe('检索', () => {
     const r = buildRetriever([chunk(1, 1, 'a', [1, 0]), chunk(2, 2, 'b', [1, 0, 0])])
     const hits = retrieve(r, 'zzz', normalizeVector([1, 0, 0])).hits
     expect(hits.map((h) => h.chunk.id)).toEqual([2])
+  })
+})
+
+describe('重排', () => {
+  const target = { baseUrl: 'https://rerank.test/v1/', apiKey: 'test-key', model: 'test-reranker' }
+  const hit = (id: number): RetrievalHit => ({
+    chunk: { id, questionId: id, title: `题目 ${id}`, path: `/q/${id}`, category: '测试', heading: '小节', text: `内容 ${id}`, vector: null },
+    score: 1 / (60 + id),
+    keywordRank: id,
+    vectorRank: null,
+    similarity: null,
+    fusedRank: id,
+    rerankScore: null,
+  })
+  const stubFetch = (respond: (body: any) => Response) => {
+    const calls: { url: string; body: any }[] = []
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body))
+      calls.push({ url, body })
+      return respond(body)
+    })
+    return calls
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('按重排分数从高到低排，同分时保持融合排序的先后，不改原数组', () => {
+    const hits = [hit(1), hit(2), hit(3), hit(4)]
+    const out = applyRerank(hits, [0.1, 0.9, 0.5, 0.9])
+    expect(out.map((h) => h.chunk.id)).toEqual([2, 4, 3, 1])
+    expect(out.map((h) => h.rerankScore)).toEqual([0.9, 0.9, 0.5, 0.1])
+    expect(out.map((h) => h.fusedRank)).toEqual([2, 4, 3, 1])
+    expect(hits.every((h) => h.rerankScore === null)).toBe(true)
+  })
+
+  it('最终顺序：融合排序和重排排序再做 RRF，重排第一、融合排序靠后的块只往前挪几位', () => {
+    const hits = [1, 2, 3, 4, 5].map(hit)
+    const scores = [0.5, 0.4, 0.3, 0.2, 0.9]
+    expect(applyRerank(hits, scores).map((h) => h.chunk.id)).toEqual([5, 1, 2, 3, 4])
+    // 第 5 块：1/65 + 1/61，介于第 2 块（1/62 + 1/63）和第 3 块（1/63 + 1/64）之间
+    const out = fuseRerank(hits, scores)
+    expect(out.map((h) => h.chunk.id)).toEqual([1, 2, 5, 3, 4])
+    expect(out.map((h) => h.rerankScore)).toEqual([0.5, 0.4, 0.9, 0.3, 0.2])
+    expect(out.map((h) => h.fusedRank)).toEqual([1, 2, 5, 3, 4])
+    // 两种排序一致时顺序不变
+    expect(fuseRerank(hits, [0.9, 0.8, 0.7, 0.6, 0.5]).map((h) => h.chunk.id)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('调用 /rerank：送的是带题目和小节的文本，分数按 index 对回原来的位置', async () => {
+    // 接口返回的结果按相关度排好了序，不是原来的顺序
+    const calls = stubFetch(() =>
+      Response.json({
+        id: 'rerank-1',
+        results: [
+          { index: 2, relevance_score: 0.8 },
+          { index: 0, relevance_score: 0.5 },
+          { index: 1, relevance_score: 0.1 },
+        ],
+        meta: { tokens: { input_tokens: 42, output_tokens: 0 } },
+      }),
+    )
+    const out = await rerankTexts(target, '缓存穿透', rerankDocuments([hit(1), hit(2), hit(3)]))
+    expect(calls[0]!.url).toBe('https://rerank.test/v1/rerank')
+    expect(calls[0]!.body).toMatchObject({ model: 'test-reranker', query: '缓存穿透', top_n: 3, return_documents: false })
+    expect(calls[0]!.body.documents[0]).toBe(embedInput('题目 1', { heading: '小节', text: '内容 1' }))
+    expect(out).toEqual({ scores: [0.5, 0.1, 0.8], tokens: 42 })
+  })
+
+  it('接口出错时带上状态码和原因（JSON 或纯文字）；结果缺了或分数不是数字时报错', async () => {
+    stubFetch(() => new Response('404 page not found', { status: 404 }))
+    await expect(rerankTexts(target, 'q', ['a', 'b'])).rejects.toThrow('重排接口出错（404）：404 page not found')
+    stubFetch(() => Response.json({ code: 20012, message: 'Model does not exist.' }, { status: 400 }))
+    await expect(rerankTexts(target, 'q', ['a', 'b'])).rejects.toThrow('重排接口出错（400）：Model does not exist.')
+    stubFetch(() => Response.json({ results: [{ index: 0, relevance_score: 0.3 }, { index: 1, relevance_score: 'high' }] }))
+    await expect(rerankTexts(target, 'q', ['a', 'b'])).rejects.toThrow('重排接口返回了 1 条有效结果，期望 2 条')
+  })
+
+  it('没有文档时不调用接口', async () => {
+    const calls = stubFetch(() => Response.json({ results: [] }))
+    expect(await rerankTexts(target, 'q', [])).toEqual({ scores: [], tokens: 0 })
+    expect(calls).toHaveLength(0)
   })
 })
 

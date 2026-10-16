@@ -10,6 +10,10 @@ const syncError = ref('')
 
 const progress = computed(() => (status.value?.chunks ? Math.round((status.value.embedded / status.value.chunks) * 100) : 0))
 const hybrid = computed(() => Boolean(status.value?.embed && status.value.embedded))
+const retrievalLabel = computed(() => {
+  if (!status.value?.rerank) return hybrid.value ? '关键词 + 向量' : '只用关键词'
+  return hybrid.value ? '关键词 + 向量 + 重排' : '关键词 + 重排'
+})
 
 // 首次部署或换了模型时，后台还在生成向量：每隔几秒刷新一次进度
 let poll: ReturnType<typeof setInterval> | undefined
@@ -47,6 +51,7 @@ function describeStats(s: NonNullable<RagStatus['lastStats']>) {
 type Only = 'hybrid' | 'keyword' | 'vector'
 const query = ref('')
 const only = ref<Only>('hybrid')
+const rerankOn = ref(true)
 const searching = ref(false)
 const result = ref<RagDebugResult | null>(null)
 const searchError = ref('')
@@ -58,7 +63,7 @@ async function search() {
   searchError.value = ''
   try {
     result.value = await $fetch<RagDebugResult>('/api/admin/rag/search', {
-      query: { q, only: only.value === 'hybrid' ? undefined : only.value },
+      query: { q, only: only.value === 'hybrid' ? undefined : only.value, rerank: rerankOn.value ? undefined : '0' },
     })
   } catch (error) {
     searchError.value = errorMessage(error)
@@ -66,7 +71,7 @@ async function search() {
     searching.value = false
   }
 }
-watch(only, () => result.value && search())
+watch([only, rerankOn], () => result.value && search())
 
 const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector: '只用向量' } as const
 </script>
@@ -75,7 +80,7 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
   <div class="kb-page">
     <AdminPageHead eyebrow="内容" title="知识库">
       <template #desc>
-        "问手册"用的检索索引：每道已发布的题按小节切块，关键词（BM25）和向量两路检索，再用 RRF 按排名融合。改题后几秒内自动同步，只给变了的块重新生成向量。
+        "问手册"用的检索索引：每道已发布的题按小节切块，关键词（BM25）和向量两路检索，用 RRF 按排名融合，配置了重排模型时再把前几十块按相关度重新排序。改题后几秒内自动同步，只给变了的块重新生成向量。
       </template>
     </AdminPageHead>
 
@@ -97,15 +102,17 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
         </div>
         <div class="a-card stat">
           <span class="stat-label">检索方式</span>
-          <span class="stat-value mode">{{ hybrid ? '关键词 + 向量' : '只用关键词' }}</span>
-          <span class="stat-sub">{{ status.running ? '正在同步…' : status.embed ? status.embed.model : '没有配置向量模型' }}</span>
+          <span class="stat-value mode">{{ retrievalLabel }}</span>
+          <span class="stat-sub">{{
+            status.running ? '正在同步…' : [status.embed?.model, status.rerank?.model].filter(Boolean).join(' · ') || '没有配置向量模型'
+          }}</span>
         </div>
       </div>
 
       <section class="a-card">
         <div class="a-card-head">
           <h2>索引</h2>
-          <span class="aside">向量模型来自 .env，改了要重启服务</span>
+          <span class="aside">向量和重排模型来自 .env，改了要重启服务</span>
         </div>
         <div class="a-card-body">
           <dl class="kv">
@@ -116,6 +123,14 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
             </dd>
             <dt>接口地址</dt>
             <dd><span class="a-code">{{ status.embed?.baseUrl ?? '—' }}</span></dd>
+            <dt>重排模型</dt>
+            <dd>
+              <template v-if="status.rerank">
+                <span class="a-code">{{ status.rerank.model }}</span>
+                <span class="muted"> · 每次给前 {{ status.rerank.candidates }} 块重新排序</span>
+              </template>
+              <span v-else class="muted">未配置</span>
+            </dd>
             <dt>最近同步</dt>
             <dd>
               <template v-if="status.lastSyncAt">
@@ -137,6 +152,12 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
             <AdminIcon name="alert" :size="16" />
             <span>生成向量出错：{{ syncError || status.lastStats?.error }}。已有的向量和关键词检索不受影响，下次同步会接着生成。</span>
           </div>
+          <div v-if="status.rerank?.lastError" class="a-alert warn">
+            <AdminIcon name="alert" :size="16" />
+            <span>
+              重排接口最近出错（{{ new Date(status.rerank.lastError.at).toLocaleString('zh-CN') }}）：{{ status.rerank.lastError.message }}。出错时用融合排序，30 秒后再试。
+            </span>
+          </div>
           <button type="button" class="btn btn-sm" :disabled="syncing || status.running" @click="syncNow">
             <AdminIcon name="sync" :size="15" />{{ syncing || status.running ? '同步中…' : '立即同步' }}
           </button>
@@ -146,13 +167,17 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
       <section class="a-card debug">
         <div class="a-card-head">
           <h2>检索调试</h2>
-          <span class="aside">看一个问题能检索到什么、两路各排第几，不调用大模型</span>
+          <span class="aside">看一个问题能检索到什么、两路各排第几、重排前后怎么变，不调用大模型</span>
         </div>
         <div class="a-card-body">
           <form class="search" @submit.prevent="search">
             <ElInput v-model="query" placeholder="输入用户可能会问的问题，比如：热点 key 过期导致数据库被打爆" clearable />
             <div class="a-seg" role="group" aria-label="检索方式">
               <button v-for="(label, key) in MODE_LABELS" :key="key" type="button" :aria-pressed="only === key" @click="only = key">{{ label }}</button>
+            </div>
+            <div v-if="status.rerank" class="a-seg" role="group" aria-label="是否重排">
+              <button type="button" :aria-pressed="rerankOn" @click="rerankOn = true">重排</button>
+              <button type="button" :aria-pressed="!rerankOn" @click="rerankOn = false">不重排</button>
             </div>
             <button type="submit" class="btn btn-sm btn-primary" :disabled="searching || !query.trim()">
               <AdminIcon name="search" :size="15" />{{ searching ? '检索中…' : '检索' }}
@@ -165,10 +190,16 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
             <p class="meta">
               {{ MODE_LABELS[result.mode] }} · 共 {{ result.hits.length }} 块
               <template v-if="result.embedMs">· 生成问题向量 {{ result.embedMs }}ms</template>
+              <template v-if="result.rerank?.applied">
+                · 重排 {{ result.rerank.candidates }} 块{{ result.rerank.cached ? '（用了缓存）' : `用时 ${result.rerank.ms}ms` }}
+              </template>
               · 总耗时 {{ result.tookMs }}ms
             </p>
             <div v-if="result.warning" class="a-alert warn">
               <AdminIcon name="alert" :size="16" />向量接口出错，这次只用了关键词：{{ result.warning }}
+            </div>
+            <div v-if="result.rerank?.error" class="a-alert warn">
+              <AdminIcon name="alert" :size="16" />重排没有生效，这次用的是融合排序：{{ result.rerank.error }}
             </div>
             <div v-if="result.hits.length" class="table-wrap">
               <table class="hits">
@@ -179,6 +210,7 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
                     <th class="c-n">关键词</th>
                     <th class="c-n">向量</th>
                     <th class="c-n" title="Σ 1 / (60 + 排名)">融合分</th>
+                    <th v-if="result.rerank?.applied" class="c-n" title="重排模型给的相关度，越高越相关">重排分</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -195,12 +227,20 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
                       <template v-else>—</template>
                     </td>
                     <td class="c-n a-mono">{{ (h.score * 1000).toFixed(1) }}</td>
+                    <td v-if="result.rerank?.applied" class="c-n a-mono">
+                      {{ h.rerankScore?.toFixed(3) ?? '—' }}<small v-if="h.fusedRank !== h.rank">原第 {{ h.fusedRank }}</small>
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p v-else class="a-empty">没有检索到内容</p>
-            <p class="foot">融合分 = Σ 1000 / (60 + 排名)，两路都排得靠前的块分最高。每道题最多取 2 块，问手册回答时用前 6 块。</p>
+            <p class="foot">
+              融合分 = Σ 1000 / (60 + 排名)，两路都排得靠前的块分最高。<template v-if="status.rerank"
+                >开启重排时，融合排序的前 {{ status.rerank.candidates }} 块交给重排模型打分，最终顺序是融合排序和按重排分的排序再做一次 RRF：
+                只有一边靠前的块往前挪得有限，所以表格不一定按重排分从高到低排。</template
+              >每道题最多取 2 块，问手册回答时用前 6 块。
+            </p>
           </template>
         </div>
       </section>

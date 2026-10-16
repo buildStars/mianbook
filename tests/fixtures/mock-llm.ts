@@ -7,6 +7,8 @@
  * - 系统提示里有"写题目解析"时返回一篇用代码块包起来的题目正文（测试浏览器端的整理），有"规划选题"时返回选题列表
  * - 流式输出故意切成小块，并把一条 data 拆在两次写入里，测试服务端的拼接
  * - 系统提示是问手册的助手时返回带引用编号的回答；/embeddings 返回按字面哈希的模拟向量
+ * - /rerank 默认保持文档原来的顺序（其他测试的检索结果不受重排影响）；用 /__rerank-boost 指定问题和文字后，
+ *   这个问题里包含这段文字的文档排到最前面
  */
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -186,6 +188,11 @@ export async function startMockLlm(): Promise<MockLlm> {
   let embedded = 0
   /** 设为 true 时 /embeddings 返回 500，测试向量接口故障时退化为关键词检索 */
   let embedDown = false
+  /** /rerank 收到的请求数（包括故意返回 500 的）和最近一次请求的概要 */
+  let reranks = 0
+  let lastRerank: { query: string; model: string; documents: number; topN: number } | null = null
+  let rerankDown = false
+  let rerankBoost: { query: string; text: string } | null = null
   const server = http.createServer(async (req, res) => {
     // 测试代码跑在别的进程里，通过这个地址查看服务端最近发给模型的内容
     if (req.url === '/__last') {
@@ -200,6 +207,26 @@ export async function startMockLlm(): Promise<MockLlm> {
     }
     if (req.url?.startsWith('/__embed-down')) {
       embedDown = req.url.endsWith('=1')
+      res.writeHead(204)
+      res.end()
+      return
+    }
+    if (req.url === '/__reranks') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ calls: reranks, last: lastRerank }))
+      return
+    }
+    if (req.url?.startsWith('/__rerank-down')) {
+      rerankDown = req.url.endsWith('=1')
+      res.writeHead(204)
+      res.end()
+      return
+    }
+    if (req.url?.startsWith('/__rerank-boost')) {
+      // 不带参数时取消
+      const params = new URL(req.url, 'http://mock').searchParams
+      const text = params.get('text')
+      rerankBoost = text ? { query: params.get('query') ?? '', text } : null
       res.writeHead(204)
       res.end()
       return
@@ -233,6 +260,27 @@ export async function startMockLlm(): Promise<MockLlm> {
           usage: { prompt_tokens: input.length * 10, total_tokens: input.length * 10 },
         }),
       )
+      return
+    }
+    if (req.url === '/v1/rerank' && req.method === 'POST') {
+      let raw = ''
+      for await (const chunk of req) raw += chunk
+      const body = JSON.parse(raw)
+      const documents: string[] = body.documents
+      reranks++
+      lastRerank = { query: body.query, model: body.model, documents: documents.length, topN: body.top_n }
+      if (rerankDown) {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ code: 50505, message: 'rerank service down' }))
+        return
+      }
+      const boost = rerankBoost && rerankBoost.query === body.query ? rerankBoost.text : null
+      // 分数随原来的位置递减（保持顺序）；被指定的文档整体高出一截
+      const results = documents
+        .map((text, index) => ({ index, relevance_score: (boost && text.includes(boost) ? 1 : 0.9) - index / (documents.length * 10) }))
+        .sort((a, b) => b.relevance_score - a.relevance_score)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ id: 'mock-rerank', results, meta: { tokens: { input_tokens: documents.join('').length } } }))
       return
     }
     if (req.url !== '/v1/chat/completions' || req.method !== 'POST') {

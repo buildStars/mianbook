@@ -358,6 +358,10 @@ export interface RetrievalHit {
   vectorRank: number | null
   /** 和问题的余弦相似度 */
   similarity: number | null
+  /** 融合排序（每道题限块数之后）里的排名，从 1 开始；重排后对照它能看出每块挪了几位 */
+  fusedRank: number
+  /** 重排模型给的相关度，没有重排时为 null */
+  rerankScore: number | null
 }
 
 export interface RetrievalResult {
@@ -399,10 +403,96 @@ export function retrieve(r: Retriever, query: string, queryVector: Float32Array 
       keywordRank: keywordRank.get(item.id) ?? null,
       vectorRank: vectorRank.get(item.id) ?? null,
       similarity: similarity.get(item.id) ?? null,
+      fusedRank: hits.length + 1,
+      rerankScore: null,
     })
     if (hits.length >= limit) break
   }
   return { mode: only ?? (useVector ? 'hybrid' : 'keyword'), hits }
+}
+
+// ---------- 重排 ----------
+
+export interface RerankTarget {
+  baseUrl: string
+  apiKey: string
+  model: string
+}
+
+export class RerankError extends Error {
+  constructor(
+    message: string,
+    public status = 0,
+  ) {
+    super(message)
+  }
+}
+
+/**
+ * 调用 /rerank 接口（硅基流动、Jina、Cohere 通用的格式）。重排模型把问题和每块资料放在一起读，给出相关度，
+ * 比向量的余弦相似度准；但每块都要和问题一起算一遍，所以只用来给检索出的前几十块重新排序。
+ * 返回的分数和 documents 一一对应
+ */
+export async function rerankTexts(
+  target: RerankTarget,
+  query: string,
+  documents: string[],
+  signal?: AbortSignal,
+): Promise<{ scores: number[]; tokens: number }> {
+  if (!documents.length) return { scores: [], tokens: 0 }
+  const res = await fetch(`${target.baseUrl.replace(/\/+$/, '')}/rerank`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
+    body: JSON.stringify({ model: target.model, query, documents, top_n: documents.length, return_documents: false }),
+    signal: signal ?? AbortSignal.timeout(30_000),
+    redirect: 'error',
+  })
+  if (!res.ok) {
+    // 出错时有的返回 JSON（{ message } 或 { error: { message } }），有的直接是一行文字（如 404 page not found）
+    const raw = await res.text().catch(() => '')
+    let detail: unknown = raw
+    try {
+      const body = JSON.parse(raw)
+      detail = body?.error?.message ?? body?.message ?? raw
+    } catch {
+      // 不是 JSON，用原文
+    }
+    const text = String(detail).replace(/\s+/g, ' ').trim().slice(0, 200)
+    throw new RerankError(`重排接口出错（${res.status}）${text ? `：${text}` : ''}`, res.status)
+  }
+  const body = await res.json()
+  // 返回结果按相关度排好了序，用 index 对回原来的位置
+  const scores: (number | null)[] = documents.map(() => null)
+  for (const r of body?.results ?? []) {
+    const i = r?.index
+    if (Number.isInteger(i) && i >= 0 && i < documents.length && Number.isFinite(r.relevance_score)) scores[i] = r.relevance_score
+  }
+  const got = scores.filter((s) => s !== null).length
+  if (got !== documents.length) throw new RerankError(`重排接口返回了 ${got} 条有效结果，期望 ${documents.length} 条`)
+  const tokens = Number(body?.meta?.tokens?.input_tokens ?? body?.usage?.total_tokens ?? 0) || 0
+  return { scores: scores as number[], tokens }
+}
+
+/** 交给重排模型的文本：和生成向量的一样，带上题目和小节标题 */
+export const rerankDocuments = (hits: RetrievalHit[]) => hits.map((h) => embedInput(h.chunk.title, h.chunk))
+
+/** 只按重排分数从高到低排序；分数相同时保持融合排序的先后 */
+export function applyRerank(hits: RetrievalHit[], scores: number[]): RetrievalHit[] {
+  return hits
+    .map((hit, i) => ({ ...hit, rerankScore: scores[i] ?? null }))
+    .sort((a, b) => (b.rerankScore ?? -Infinity) - (a.rerankScore ?? -Infinity) || a.fusedRank - b.fusedRank)
+}
+
+/**
+ * 重排后的最终顺序：融合排序（hits 原来的顺序）和按重排分数的排序再做一次 RRF，两边都靠前的块才排得靠前。
+ * 评测里只按重排分数排时，有的题被字面相近、领域不同的块挤了下去（"大文件断点续传"排到了"流式连接断了怎么续传"后面）；
+ * 再和融合排序融合一次，各项指标都不低于不重排，见 README 的问手册评测
+ */
+export function fuseRerank(hits: RetrievalHit[], scores: number[], k = 60): RetrievalHit[] {
+  const reranked = applyRerank(hits, scores)
+  const byId = new Map(reranked.map((h) => [h.chunk.id, h]))
+  const ranked = (list: RetrievalHit[]) => list.map((h) => ({ id: h.chunk.id, score: 0 }))
+  return rrf([ranked(hits), ranked(reranked)], k).map((r) => byId.get(r.id)!)
 }
 
 // ---------- 评测 ----------

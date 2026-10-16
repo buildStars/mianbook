@@ -35,6 +35,22 @@ export interface RagDebugHit {
   keywordRank: number | null
   vectorRank: number | null
   similarity: number | null
+  /** 重排前（融合排序里）的排名 */
+  fusedRank: number
+  rerankScore: number | null
+}
+
+/** 一次检索的重排情况；没配置重排模型或这次没开时为 null */
+export interface RagRerankInfo {
+  model: string
+  /** 是否按重排分数调整了顺序；为 false 时用的是融合排序，error 是原因（候选不到两块时 error 为 null） */
+  applied: boolean
+  /** 同一个问题、同一批候选重排过，这次直接用了缓存的分数 */
+  cached: boolean
+  /** 交给重排模型的候选块数 */
+  candidates: number
+  ms: number
+  error: string | null
 }
 
 export interface RagDebugResult {
@@ -42,6 +58,7 @@ export interface RagDebugResult {
   embedMs: number
   tookMs: number
   warning: string | null
+  rerank: RagRerankInfo | null
   hits: RagDebugHit[]
 }
 
@@ -50,6 +67,8 @@ export interface RagStatus {
   chunks: number
   embedded: number
   embed: { model: string; baseUrl: string } | null
+  /** 重排模型；lastError 是最近一次出错（之后调用成功会清掉） */
+  rerank: { model: string; baseUrl: string; candidates: number; lastError: { message: string; at: string } | null } | null
   running: boolean
   lastSyncAt: string | null
   lastStats: {

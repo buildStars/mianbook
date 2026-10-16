@@ -1,15 +1,20 @@
 import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import type { RagRerankInfo } from '#shared/types/ask'
 import {
   bufferToVector,
   buildRetriever,
   chunkQuestion,
   embedInput,
   embedTexts,
+  fuseRerank,
   hashText,
+  rerankDocuments,
+  rerankTexts,
   retrieve,
   vectorToBuffer,
   type EmbedTarget,
   type IndexedChunk,
+  type RerankTarget,
   type RetrievalResult,
   type RetrieveOptions,
   type Retriever,
@@ -27,6 +32,30 @@ export function embedTarget(): EmbedTarget | null {
     batchSize: Number(embed.batchSize) || 16,
   }
 }
+
+/** 重排模型配置：接口地址和 Key 没单独填时沿用向量模型的；没有 Key 或 model 为空时为 null，不重排 */
+export function rerankTarget(): (RerankTarget & { candidates: number; timeoutMs: number }) | null {
+  const { rerank, embed } = useRuntimeConfig()
+  const model = String(rerank.model || '')
+  const apiKey = String(rerank.apiKey || embed.apiKey || '')
+  if (!model || !apiKey) return null
+  return {
+    baseUrl: String(rerank.baseUrl || embed.baseUrl || '').replace(/\/+$/, ''),
+    apiKey,
+    model,
+    candidates: Math.max(2, Number(rerank.candidates) || 30),
+    timeoutMs: Math.max(100, Number(rerank.timeoutMs) || 3000),
+  }
+}
+
+// 重排接口出错后暂停一会儿再试：接口挂了或一直超时的时候，不让每次检索都多等一个超时
+const RERANK_PAUSE_MS = 30_000
+const rerankState = { pausedUntil: 0, lastError: null as { message: string; at: Date } | null }
+
+// 重排分数的缓存：同一个问题、同一批候选（比如示例问题、刷新重试）不用重复请求。
+// 键里有候选块的 id，改题后块会重新生成、id 会变，不会用到旧分数
+const rerankCache = new Map<string, number[]>()
+const RERANK_CACHE_SIZE = 200
 
 // ---------- 内存里的检索器 ----------
 
@@ -101,11 +130,21 @@ export interface HandbookSearch extends RetrievalResult {
   tookMs: number
   /** 向量接口出错时退化为只用关键词，这里是原因 */
   warning: string | null
+  rerank: RagRerankInfo | null
 }
 
-/** 检索手册：有向量时混合检索，向量接口出错时退化为只用关键词，不影响回答 */
-export async function searchHandbook(query: string, options: RetrieveOptions = {}): Promise<HandbookSearch> {
+export interface HandbookSearchOptions extends RetrieveOptions {
+  /** 配置了重排模型时默认重排；传 false 只用融合排序（后台对比重排前后用） */
+  rerank?: boolean
+}
+
+/**
+ * 检索手册：有向量时混合检索，配置了重排模型时再把前几十块重新排序。
+ * 向量接口出错时退化为只用关键词，重排出错时用融合排序，都不影响回答
+ */
+export async function searchHandbook(query: string, options: HandbookSearchOptions = {}): Promise<HandbookSearch> {
   const started = performance.now()
+  const { rerank: wantRerank = true, ...retrieveOptions } = options
   const retriever = await getRetriever()
   const target = embedTarget()
   let vector: Float32Array | null = null
@@ -121,8 +160,52 @@ export async function searchHandbook(query: string, options: RetrieveOptions = {
     }
     embedMs = Math.round(performance.now() - t0)
   }
-  const result = retrieve(retriever, query, vector, options)
-  return { ...result, embedMs, tookMs: Math.round(performance.now() - started), warning }
+
+  const limit = retrieveOptions.limit ?? 6
+  const reranker = wantRerank ? rerankTarget() : null
+  // 要重排时先多取一些候选，重排后再截到 limit
+  const result = retrieve(retriever, query, vector, { ...retrieveOptions, limit: reranker ? Math.max(limit, reranker.candidates) : limit })
+  let hits = result.hits.slice(0, limit)
+  let rerank: RagRerankInfo | null = null
+  if (reranker) {
+    const pool = result.hits.slice(0, reranker.candidates)
+    rerank = { model: reranker.model, applied: false, cached: false, candidates: pool.length, ms: 0, error: null }
+    // 调用方要的条数比候选还多时，候选以外的按融合排序接在后面
+    const reorder = (scores: number[]) => [...fuseRerank(pool, scores), ...result.hits.slice(pool.length)].slice(0, limit)
+    const cacheKey = `${reranker.model}\n${query}\n${pool.map((h) => h.chunk.id).join(',')}`
+    const cached = rerankCache.get(cacheKey)
+    const now = Date.now()
+    if (pool.length < 2) {
+      // 没有可调整的顺序
+    } else if (cached) {
+      rerankCache.delete(cacheKey)
+      rerankCache.set(cacheKey, cached)
+      hits = reorder(cached)
+      rerank.applied = true
+      rerank.cached = true
+    } else if (now < rerankState.pausedUntil) {
+      rerank.error = `重排接口刚才出错，${Math.ceil((rerankState.pausedUntil - now) / 1000)} 秒后再试：${rerankState.lastError?.message ?? ''}`
+    } else {
+      const t0 = performance.now()
+      try {
+        const { scores } = await rerankTexts(reranker, query, rerankDocuments(pool), AbortSignal.timeout(reranker.timeoutMs))
+        rerankCache.set(cacheKey, scores)
+        if (rerankCache.size > RERANK_CACHE_SIZE) rerankCache.delete(rerankCache.keys().next().value!)
+        hits = reorder(scores)
+        rerank.applied = true
+        rerankState.lastError = null
+      } catch (error) {
+        const timedOut = (error as { name?: string } | null)?.name === 'TimeoutError'
+        const message = timedOut ? `重排接口 ${reranker.timeoutMs}ms 内没有响应` : error instanceof Error ? error.message : '重排接口出错'
+        rerankState.pausedUntil = Date.now() + RERANK_PAUSE_MS
+        rerankState.lastError = { message, at: new Date() }
+        rerank.error = message
+        console.error('[rag] 重排失败，改用融合排序', error)
+      }
+      rerank.ms = Math.round(performance.now() - t0)
+    }
+  }
+  return { ...result, hits, embedMs, tookMs: Math.round(performance.now() - started), warning, rerank }
 }
 
 // ---------- 同步索引 ----------
@@ -302,6 +385,7 @@ async function runSync(): Promise<RagSyncStats> {
 export async function ragStatus() {
   const t = tables.questionChunks
   const target = embedTarget()
+  const reranker = rerankTarget()
   const [row] = await useDb()
     .select({
       chunks: sql<number>`count(*)`,
@@ -317,6 +401,14 @@ export async function ragStatus() {
     chunks: Number(row?.chunks ?? 0),
     embedded: Number(row?.embedded ?? 0),
     embed: target ? { model: target.model, baseUrl: target.baseUrl } : null,
+    rerank: reranker
+      ? {
+          model: reranker.model,
+          baseUrl: reranker.baseUrl,
+          candidates: reranker.candidates,
+          lastError: rerankState.lastError ? { message: rerankState.lastError.message, at: rerankState.lastError.at.toISOString() } : null,
+        }
+      : null,
     running: Boolean(state.running),
     lastSyncAt: state.lastSyncAt?.toISOString() ?? null,
     lastStats: state.lastStats,
