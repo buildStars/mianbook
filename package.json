@@ -13,6 +13,7 @@
     "eval:retrieval": "tsx scripts/eval-retrieval.ts",
     "eval:scoring": "tsx scripts/eval-scoring.ts",
     "radar": "tsx scripts/topic-radar.ts",
+    "server:env": "node scripts/server-env.mjs",
     "db:stop": "node scripts/mysql.mjs stop",
     "db:status": "node scripts/mysql.mjs status",
     "db:generate": "drizzle-kit generate",
