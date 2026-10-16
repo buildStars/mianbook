@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
 import type { InterviewTurn, MockConfig, MockItem, StoredCard, TocItem } from '../../shared/types/handbook'
+import type { AgentMessage, AgentState } from '../../shared/types/agent'
 
 // 用 datetime 而不是 timestamp，避开 2038 年问题；更新时间由 Drizzle 在每次 update 时写入
 const createdAt = () => datetime('created_at', { mode: 'date' }).notNull().default(sql`CURRENT_TIMESTAMP`)
@@ -234,7 +235,7 @@ export const reviewLogs = mysqlTable(
     /** 1 不会、2 模糊、3 会了、4 很熟 */
     rating: tinyint('rating').notNull(),
     /** review 复习页、page 题目页手动标记、interview 单题 AI 面试、mock 整场模拟面试 */
-    source: mysqlEnum('source', ['review', 'page', 'interview', 'mock']).notNull(),
+    source: mysqlEnum('source', ['review', 'page', 'interview', 'mock', 'agent']).notNull(),
     /** 评分前的卡片；在题目页上短时间内改主意时，用它撤回上一次评分 */
     prevCard: json('prev_card').$type<StoredCard | null>(),
     createdAt: createdAt(),
@@ -312,4 +313,24 @@ export const questionChunks = mysqlTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex('question_chunks_question_ord_unique').on(t.questionId, t.ord)],
+)
+
+/** Agent 面试：对话消息（OpenAI 格式，含工具调用和结果）和面试状态（问过的题、得分、总结） */
+export const agentSessions = mysqlTable(
+  'agent_sessions',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    userId: int('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 候选人写的面试目标，如"下周面字节前端二面，React 和性能是重点" */
+    goal: varchar('goal', { length: 500 }).notNull(),
+    maxQuestions: tinyint('max_questions').notNull(),
+    messages: json('messages').$type<AgentMessage[]>().notNull(),
+    state: json('state').$type<AgentState>().notNull(),
+    status: mysqlEnum('status', ['active', 'finished']).notNull().default('active'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('agent_sessions_user_created_idx').on(t.userId, t.createdAt)],
 )

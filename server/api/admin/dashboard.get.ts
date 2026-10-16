@@ -10,7 +10,7 @@ const schema = z.object({
 
 const DAY = 86_400_000
 const BOARD_SIZE = 8
-const KINDS: AiKind[] = ['interview', 'ask', 'report', 'resume', 'author']
+const KINDS: AiKind[] = ['interview', 'agent', 'ask', 'report', 'resume', 'author']
 
 const round1 = (n: number | string | null | undefined) => (n == null ? null : Math.round(Number(n) * 10) / 10)
 

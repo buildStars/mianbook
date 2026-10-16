@@ -40,7 +40,7 @@ const aiTrend = computed(() => {
   return { pct, up: pct >= 0 }
 })
 
-const KIND_LABELS = { interview: 'AI 单题面试', ask: '问手册', report: '模拟面试总结', resume: '简历出题', author: '后台 AI 写题' } as const
+const KIND_LABELS = { interview: 'AI 单题面试', agent: 'Agent 面试', ask: '问手册', report: '模拟面试总结', resume: '简历出题', author: '后台 AI 写题' } as const
 const kindMax = computed(() => Math.max(1, ...(data.value?.ai.byKind ?? []).map((k) => k.site + k.own)))
 
 const money = (c: { amount: number; currency: 'CNY' | 'USD' }) => `${c.currency === 'CNY' ? '¥' : '$'}${c.amount.toFixed(2)}`

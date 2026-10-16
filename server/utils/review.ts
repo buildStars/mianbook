@@ -12,7 +12,7 @@ const scheduler = fsrs({ enable_short_term: false, maximum_interval: 120 })
 /** 题目页上多久之内改评分算"改主意"，撤回上一次再重新计算，避免来回点击把复习次数刷高 */
 const UNDO_WINDOW_MS = 10 * 60 * 1000
 
-export type ReviewSource = 'review' | 'page' | 'interview' | 'mock'
+export type ReviewSource = 'review' | 'page' | 'interview' | 'mock' | 'agent'
 
 export const gradeFromStatus: Record<StudyStatus, ReviewGrade> = { weak: 1, fuzzy: 2, mastered: 3 }
 

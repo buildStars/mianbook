@@ -43,6 +43,13 @@
       "when": 1792162280882,
       "tag": "0005_question_chunks",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1792163728921,
+      "tag": "0006_agent_sessions",
+      "breakpoints": true
     }
   ]
 }

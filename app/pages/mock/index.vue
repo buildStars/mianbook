@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AgentSessionSummary } from '#shared/types/agent'
 import type { MockDifficulty, MockSessionSummary } from '#shared/types/handbook'
 
 useHead({ title: '模拟面试 | 全栈面试手册' })
@@ -50,23 +51,31 @@ const history = ref<MockSessionSummary[]>([])
 const active = computed(() => history.value.find((s) => s.status === 'active') ?? null)
 const finishedList = computed(() => history.value.filter((s) => s.status === 'finished'))
 
+const agentHistory = ref<AgentSessionSummary[]>([])
+
 async function loadHistory() {
   if (!loggedIn.value) return
-  history.value = await $fetch<MockSessionSummary[]>('/api/mock').catch(() => [])
+  ;[history.value, agentHistory.value] = await Promise.all([
+    $fetch<MockSessionSummary[]>('/api/mock').catch(() => []),
+    $fetch<AgentSessionSummary[]>('/api/agent').catch(() => []),
+  ])
 }
 onMounted(loadHistory)
 watch(loggedIn, loadHistory)
 
 const canUse = computed(() => hasKey.value || Boolean(ai.value?.enabled))
-/** 出题方式：按方向从题库抽，或者按简历出项目深挖题 */
-const mode = ref<'bank' | 'resume'>('bank')
+/** 出题方式：按方向从题库抽、按简历出项目深挖题，或者让 Agent 面试官自己决定 */
+const mode = ref<'bank' | 'resume' | 'agent'>(route.query.mode === 'agent' ? 'agent' : 'bank')
+const agentForm = reactive({ goal: '', maxQuestions: 5 })
 const resumeForm = reactive({ resume: '', role: '', projectCount: 4, bankCount: 3, followUps: 1 })
 
-/** 每题 1 轮加追问次数，结束后再生成 1 次总结；按简历出题还要多 1 次出题 */
+/** 每题 1 轮加追问次数，结束后再生成 1 次总结；按简历出题还要多 1 次出题；Agent 面试每回答一次算 1 次，再加开场 */
 const estimate = computed(() =>
   mode.value === 'bank'
     ? form.count * (1 + form.followUps) + 1
-    : (resumeForm.projectCount + resumeForm.bankCount) * (1 + resumeForm.followUps) + 2,
+    : mode.value === 'resume'
+      ? (resumeForm.projectCount + resumeForm.bankCount) * (1 + resumeForm.followUps) + 2
+      : agentForm.maxQuestions + 1,
 )
 const perQuestion = computed(() => 1 + (mode.value === 'bank' ? form.followUps : resumeForm.followUps))
 const custom = computed(() => form.track === 'custom')
@@ -122,6 +131,30 @@ async function startResume() {
   }
 }
 
+async function startAgent() {
+  if (starting.value) return
+  if (agentForm.goal.trim().length < 4) {
+    errorMsg.value = '写一下面试目标，比如岗位、公司和想重点准备的方向'
+    return
+  }
+  starting.value = true
+  errorMsg.value = ''
+  try {
+    const { id } = await $fetch<{ id: number }>('/api/agent', { method: 'POST', body: { ...agentForm } })
+    await navigateTo(`/mock/agent/${id}`)
+  } catch (error: any) {
+    errorMsg.value = error?.data?.message ?? '创建失败，请稍后再试'
+  } finally {
+    starting.value = false
+  }
+}
+
+async function removeAgent(item: AgentSessionSummary) {
+  if (!confirm('删除这场 Agent 面试吗？已经写进复习计划的得分会保留。')) return
+  await $fetch(`/api/agent/${item.id}`, { method: 'DELETE' })
+  agentHistory.value = agentHistory.value.filter((s) => s.id !== item.id)
+}
+
 async function remove(item: MockSessionSummary) {
   if (!confirm(`删除"${item.title}"这场面试吗？每道题的面试记录仍会保留在题目页。`)) return
   await $fetch(`/api/mock/${item.id}`, { method: 'DELETE' })
@@ -160,6 +193,7 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
         <div class="segmented mode" role="tablist" aria-label="出题方式">
           <button type="button" role="tab" :aria-checked="mode === 'bank'" :aria-selected="mode === 'bank'" @click="mode = 'bank'">按方向出题</button>
           <button type="button" role="tab" :aria-checked="mode === 'resume'" :aria-selected="mode === 'resume'" @click="mode = 'resume'">按简历出题</button>
+          <button type="button" role="tab" :aria-checked="mode === 'agent'" :aria-selected="mode === 'agent'" @click="mode = 'agent'">Agent 面试官</button>
         </div>
 
         <template v-if="mode === 'bank'">
@@ -251,6 +285,31 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
         </button>
         </template>
 
+        <template v-else-if="mode === 'agent'">
+          <div class="field">
+            <p class="label">面试目标</p>
+            <textarea
+              v-model="agentForm.goal"
+              class="resume-input"
+              aria-label="面试目标"
+              rows="3"
+              maxlength="500"
+              placeholder="例如：下周面字节跳动前端二面，React 和性能优化是重点，算法一般"
+            />
+          </div>
+          <div class="row">
+            <div class="field">
+              <p class="label">主问题数量</p>
+              <div class="segmented" role="radiogroup" aria-label="主问题数量">
+                <button v-for="n in [3, 5, 8]" :key="n" type="button" role="radio" :aria-checked="agentForm.maxQuestions === n" @click="agentForm.maxQuestions = n">{{ n }} 道</button>
+              </div>
+            </div>
+          </div>
+          <p class="hint">
+            面试官是一个会调用工具的 AI Agent：先看你的学习记录和薄弱点，再按目标从题库里找题；每次回答后自己查参考答案打分，决定追问还是换题，答得好就加难度，答不上来就换个更基础的。主问题的得分会写进复习计划。
+          </p>
+        </template>
+
         <template v-else>
           <div class="field">
             <p class="label">简历或项目经历</p>
@@ -298,7 +357,8 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
 
         <div class="start">
           <p class="cost">
-            预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ perQuestion }} 次，加 1 次总结<template v-if="mode === 'resume'">和 1 次出题</template>）。
+            <template v-if="mode === 'agent'">预计约 <b>{{ estimate }}</b> 次 AI 次数（每回答一次算 1 次，追问另算）。</template>
+            <template v-else>预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ perQuestion }} 次，加 1 次总结<template v-if="mode === 'resume'">和 1 次出题</template>）。</template>
             <template v-if="hasKey">使用你自己的 Key（{{ aiKey?.model }}），不限次数。</template>
             <template v-else-if="ai?.enabled">今天还剩 {{ ai.remaining }} 次，不够时可以中途停下，下次接着答。</template>
             <template v-else>站点没有配置 AI 服务，需要填写你自己的 API Key。</template>
@@ -308,17 +368,36 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
             type="button"
             class="btn btn-ai btn-lg"
             :disabled="starting || !canUse"
-            @click="mode === 'bank' ? start() : startResume()"
+            @click="mode === 'bank' ? start() : mode === 'resume' ? startResume() : startAgent()"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" /></svg>
             <template v-if="mode === 'bank'">{{ starting ? '正在抽题…' : '开始面试' }}</template>
+            <template v-else-if="mode === 'agent'">{{ starting ? '正在准备…' : '开始 Agent 面试' }}</template>
             <template v-else>{{ starting ? 'AI 正在读简历、出题…' : 'AI 出题并开始' }}</template>
           </button>
         </div>
         <p v-if="errorMsg" class="error" role="alert">{{ errorMsg }}</p>
       </section>
 
-      <section v-if="finishedList.length" class="history">
+      <section v-if="mode === 'agent' && agentHistory.length" class="history">
+        <h2 class="serif">Agent 面试记录</h2>
+        <ul>
+          <li v-for="s in agentHistory" :key="s.id" class="history-row">
+            <NuxtLink :to="`/mock/agent/${s.id}`" class="history-main">
+              <span class="history-title">{{ s.goal }}</span>
+              <span class="history-meta">
+                {{ formatTime(s.createdAt) }} · 问了 {{ s.asked }} / {{ s.maxQuestions }} 题{{ s.status === 'active' ? ' · 进行中' : '' }}
+              </span>
+            </NuxtLink>
+            <span class="history-score" :class="scoreLevel(s.score)">{{ s.score ?? '—' }}<small v-if="s.score !== null"> 分</small></span>
+            <button type="button" class="icon-btn" aria-label="删除这场面试" @click="removeAgent(s)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section v-if="finishedList.length && mode !== 'agent'" class="history">
         <h2 class="serif">面试记录</h2>
         <ul>
           <li v-for="s in finishedList" :key="s.id" class="history-row">

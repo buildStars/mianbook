@@ -106,6 +106,80 @@ export function mockEmbedding(text: string, dims = 256): number[] {
   return v.map((x) => x / norm)
 }
 
+/**
+ * 模拟 Agent 面试官，按最后一条消息决定下一步：
+ * - 面试目标 → 查学习记录 + 搜题；搜到题 → 出第一题；出题成功 → 用文字问出来，停下等回答
+ * - 回答 → 查参考答案 → 打分（回答里写 [score=N] 就打 N 分，默认 6 分）→ 写 [followup] 时追问，否则出下一题，问满题量就结束
+ * - 回答里写 [bad-assess] 时故意给另一道题打分，测试服务端的校验；跳过 → 出下一题；要求结束 → 写总结
+ */
+export function agentReply(messages: any[]): { text?: string; calls?: { name: string; args: any }[] } {
+  const last = messages.at(-1)
+  const parse = (s: string) => {
+    try {
+      return JSON.parse(s)
+    } catch {
+      return {}
+    }
+  }
+  const callsOf = (name: string) =>
+    messages.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []) : [])).filter((c: any) => c.function.name === name)
+  const resultOf = (call: any) => parse(messages.find((m) => m.role === 'tool' && m.tool_call_id === call.id)?.content ?? '{}')
+  const asked = callsOf('ask_question').filter((c: any) => resultOf(c).ok)
+  const currentQid = () => JSON.parse(asked.at(-1)?.function.arguments ?? '{}').question_id
+  const maxQuestions = Number(messages.find((m) => m.role === 'user')?.content.match(/【题量】(\d+)/)?.[1] ?? 3)
+  const mainsAsked = asked.filter((c: any) => !JSON.parse(c.function.arguments).follow_up)
+
+  const nextQuestion = () => {
+    if (mainsAsked.length >= maxQuestions) {
+      return { calls: [{ name: 'finish_interview', args: { summary: '整体基础不错，原理还要加强。', next_steps: ['复习缓存一致性', '练习讲清方案取舍'] } }] }
+    }
+    const used = new Set(mainsAsked.map((c: any) => JSON.parse(c.function.arguments).question_id))
+    const found = callsOf('search_questions').flatMap((c: any) => resultOf(c).questions ?? [])
+    const next = found.find((q: any) => !used.has(q.id))
+    return next ? { calls: [{ name: 'ask_question', args: { question_id: next.id } }] } : { text: '题库里没有更多合适的题了。' }
+  }
+
+  if (last.role === 'user') {
+    const c: string = last.content
+    if (c.includes('要求现在结束')) return { calls: [{ name: 'finish_interview', args: { summary: '只答了一部分，基础还可以。', next_steps: ['把没答完的题补上'] } }] }
+    if (c.includes('跳过')) return nextQuestion()
+    if (c.includes('[bad-assess]')) return { calls: [{ name: 'record_assessment', args: { question_id: currentQid() + 100000, score: 9, strengths: [], gaps: [] } }] }
+    if (c.startsWith('<answer>')) return { calls: [{ name: 'get_question_reference', args: { question_id: currentQid() } }] }
+    return {
+      text: '好的，我先看看你的学习记录，再挑几道题。',
+      calls: [
+        { name: 'get_learning_profile', args: {} },
+        { name: 'search_questions', args: { query: '缓存穿透 击穿 雪崩', limit: 5 } },
+      ],
+    }
+  }
+
+  // 上一步工具调用的结果
+  const step = messages.findLast((m) => m.role === 'assistant')
+  const names: string[] = (step?.tool_calls ?? []).map((c: any) => c.function.name)
+  const results = (step?.tool_calls ?? []).map(resultOf)
+  if (results.some((r: any) => r.error)) return { text: `工具出错了：${results.find((r: any) => r.error).error}` }
+  if (names.includes('finish_interview')) return { text: '面试结束，祝你面试顺利！' }
+  if (names.includes('ask_question')) {
+    const r = results[names.indexOf('ask_question')]
+    return { text: r.followUp ? `追问：${r.followUp}` : `第 ${r.index} 题：${r.title}` }
+  }
+  if (names.includes('get_question_reference')) {
+    const answer = messages.findLast((m) => m.role === 'user')?.content ?? ''
+    const score = Number(answer.match(/\[score=(\d+)\]/)?.[1] ?? 6)
+    return { calls: [{ name: 'record_assessment', args: { question_id: currentQid(), score, strengths: ['讲到了主要流程'], gaps: ['没讲清取舍'] } }] }
+  }
+  if (names.includes('record_assessment')) {
+    const answer = messages.findLast((m) => m.role === 'user')?.content ?? ''
+    if (answer.includes('[followup]')) {
+      return { text: '答对了一部分。', calls: [{ name: 'ask_question', args: { question_id: currentQid(), follow_up: '如果数据量再大十倍，你会怎么改？' } }] }
+    }
+    const next = nextQuestion()
+    return { text: '点评：主干正确，取舍讲得不够。', ...next }
+  }
+  return nextQuestion()
+}
+
 export async function startMockLlm(): Promise<MockLlm> {
   let lastBody: any = null
   /** /embeddings 收到的文本总数，测试增量同步时只给变了的块生成向量 */
@@ -177,6 +251,26 @@ export async function startMockLlm(): Promise<MockLlm> {
     if (user.includes('[upstream-error]')) {
       res.writeHead(500, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: { message: 'boom' } }))
+      return
+    }
+    // Agent 面试：按对话状态决定调用哪个工具
+    if (Array.isArray(body.tools) && body.tools.length) {
+      const reply = agentReply(body.messages)
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
+      const write = (delta: unknown, extra: Record<string, unknown> = {}) =>
+        res.write(`data: ${JSON.stringify({ choices: [{ delta, ...extra }] })}\n\n`)
+      for (const piece of reply.text?.match(/[\s\S]{1,8}/g) ?? []) write({ content: piece })
+      ;(reply.calls ?? []).forEach((call, index) => {
+        // 参数故意拆成两块，测试服务端按 index 拼接
+        const args = JSON.stringify(call.args)
+        const mid = Math.floor(args.length / 2)
+        write({ tool_calls: [{ index, id: `call_${Math.random().toString(36).slice(2, 10)}`, type: 'function', function: { name: call.name, arguments: '' } }] })
+        write({ tool_calls: [{ index, function: { arguments: args.slice(0, mid) } }] })
+        write({ tool_calls: [{ index, function: { arguments: args.slice(mid) } }] })
+      })
+      write({}, { finish_reason: reply.calls?.length ? 'tool_calls' : 'stop' })
+      res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 300, completion_tokens: 50 } })}\n\n`)
+      res.end('data: [DONE]\n\n')
       return
     }
     if (body.stream === false) {

@@ -2,6 +2,7 @@ import { and, count, eq, gte, ne, notLike } from 'drizzle-orm'
 import { createError, getHeader, type H3Event } from 'h3'
 import { AI_HEADERS, AI_PROVIDERS } from '#shared/utils/ai-providers'
 import type { AiKind } from '#shared/types/admin'
+import type { AgentMessage, ToolCall } from '#shared/types/agent'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -205,6 +206,76 @@ export async function* streamChat(
       if (usage) yield { usage }
     }
   }
+}
+
+// ---------- 工具调用（Function Calling） ----------
+
+export interface ToolDefinition {
+  type: 'function'
+  function: { name: string; description: string; parameters: Record<string, unknown> }
+}
+
+/**
+ * 流式调用并允许模型调用工具：文字边生成边产出；工具调用的参数是分好几块流过来的，
+ * 按 index 拼完整后在最后一次性产出
+ */
+export async function* streamChatWithTools(
+  target: AiTarget,
+  messages: AgentMessage[],
+  tools: ToolDefinition[],
+  signal: AbortSignal,
+  options: { maxTokens?: number; timeoutMs?: number } = {},
+): AsyncGenerator<{ delta?: string; toolCalls?: ToolCall[]; usage?: ChatUsage }> {
+  const res = await fetch(`${target.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
+    body: JSON.stringify({ model: target.model, messages, tools, stream: true, max_tokens: options.maxTokens ?? 1500 }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(options.timeoutMs ?? 120_000)]),
+    redirect: 'error',
+  })
+  if (!res.ok || !res.body) throw await toAiError(res, target)
+
+  const calls: ToolCall[] = []
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ''
+  let finished = false
+  while (!finished) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += value
+    let newline: number
+    while ((newline = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, newline).trim()
+      buffer = buffer.slice(newline + 1)
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
+      if (data === '[DONE]') {
+        finished = true
+        break
+      }
+      let chunk: any
+      try {
+        chunk = JSON.parse(data)
+      } catch {
+        continue
+      }
+      const delta = chunk.choices?.[0]?.delta
+      if (delta?.content) yield { delta: delta.content }
+      for (const part of delta?.tool_calls ?? []) {
+        const i = typeof part.index === 'number' ? part.index : calls.length
+        calls[i] ??= { id: '', type: 'function', function: { name: '', arguments: '' } }
+        if (part.id) calls[i]!.id = part.id
+        if (part.function?.name) calls[i]!.function.name += part.function.name
+        if (part.function?.arguments) calls[i]!.function.arguments += part.function.arguments
+      }
+      const usage = chunk.usage ?? chunk.choices?.[0]?.usage
+      if (usage) yield { usage }
+    }
+  }
+  const complete = calls.filter(Boolean)
+  // 个别服务商不给 id，自己补一个，回传结果时要用它对应
+  complete.forEach((c, i) => (c.id ||= `call_${Date.now()}_${i}`))
+  if (complete.length) yield { toolCalls: complete }
 }
 
 /** 列出可用模型；有的服务商没有这个接口，调用方要处理失败 */
