@@ -1,0 +1,11 @@
+[
+  {"id":"daily-interview-question","name":"前端每日一题（Advanced-Frontend）","repo":"Advanced-Frontend/Daily-Interview-Question","type":"issues","maxPages":6},
+  {"id":"fe-interview","name":"前端面试每日 3+1（haizlin）","repo":"haizlin/fe-interview","type":"issues","maxPages":8},
+  {"id":"fe-interview-lgwebdream","name":"FE-Interview（lgwebdream）","repo":"lgwebdream/FE-Interview","type":"issues","maxPages":4},
+  {"id":"javaguide","name":"JavaGuide","repo":"Snailclimb/JavaGuide","type":"markdown","paths":["docs/java/basis","docs/java/collection","docs/java/concurrent","docs/database/mysql","docs/database/redis","docs/cs-basics/network","docs/cs-basics/operating-system"],"fileFilter":"questions|interview"},
+  {"id":"advanced-java","name":"advanced-java（doocs）","repo":"doocs/advanced-java","type":"markdown","paths":["README.md"],"defaultCategory":"basics/distributed"},
+  {"id":"interview-go","name":"interview-go（lifei6671）","repo":"lifei6671/interview-go","type":"markdown","paths":["README.md"],"defaultCategory":"basics/go"},
+  {"id":"llm-interview-note","name":"LLM 面试笔记（wdndev）","repo":"wdndev/llm_interview_note","type":"markdown","paths":["README.md"],"defaultCategory":"ai/llm"},
+  {"id":"llms-interview-notes","name":"LLMs 面试笔记（km1994）","repo":"km1994/LLMs_interview_notes","type":"markdown","paths":["README.md"],"defaultCategory":"ai/llm"},
+  {"id":"interview-internal","name":"大厂面试题（0voice）","repo":"0voice/interview_internal_reference","type":"markdown","paths":["README.md"]}
+]

@@ -27,3 +27,6 @@ Thumbs.db
 
 # 评测结果（每次运行生成）
 evals/results/
+
+# 选题雷达的报告（npm run radar 生成）
+reports/
