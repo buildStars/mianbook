@@ -50,6 +50,13 @@
       "when": 1792163728921,
       "tag": "0006_agent_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1792165247170,
+      "tag": "0007_api_tokens",
+      "breakpoints": true
     }
   ]
 }

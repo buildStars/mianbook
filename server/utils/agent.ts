@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type {
   AgentAskedItem,
   AgentMessage,
@@ -7,7 +7,6 @@ import type {
   AgentState,
   ToolCall,
 } from '#shared/types/agent'
-import type { StudyStatus } from '#shared/types/handbook'
 import {
   ACTION_TEXT,
   AGENT_TOOLS,
@@ -79,119 +78,19 @@ interface ToolContext {
   finished: boolean
 }
 
-const STATUS_LABEL: Record<StudyStatus, string> = { weak: '不会', fuzzy: '模糊', mastered: '掌握' }
-
-async function questionMeta() {
-  const outline = await getOutline()
-  const meta = new Map<number, { title: string; category: string; categorySlug: string; difficulty: number; path: string }>()
-  for (const part of outline)
-    for (const cat of part.categories)
-      for (const q of cat.questions) meta.set(q.id, { title: q.title, category: cat.title, categorySlug: cat.slug, difficulty: q.difficulty, path: q.path })
-  return meta
-}
-
 async function getLearningProfile(ctx: ToolContext) {
-  const db = useDb()
-  const [meta, records, interviews, dueRows] = await Promise.all([
-    questionMeta(),
-    db
-      .select({ questionId: tables.studyRecords.questionId, status: tables.studyRecords.status })
-      .from(tables.studyRecords)
-      .where(eq(tables.studyRecords.userId, ctx.userId)),
-    db
-      .select({ questionId: tables.interviews.questionId, turns: tables.interviews.turns })
-      .from(tables.interviews)
-      .where(eq(tables.interviews.userId, ctx.userId))
-      .orderBy(desc(tables.interviews.updatedAt))
-      .limit(200),
-    db
-      .select({ questionId: tables.reviewCards.questionId })
-      .from(tables.reviewCards)
-      .where(and(eq(tables.reviewCards.userId, ctx.userId), lt(tables.reviewCards.due, new Date(Date.now() + 86_400_000)))),
-  ])
-
-  const byCat = new Map<string, { category: string; total: number; mastered: number; fuzzy: number; weak: number; scores: number[] }>()
-  for (const m of meta.values()) {
-    const c = byCat.get(m.category) ?? { category: m.category, total: 0, mastered: 0, fuzzy: 0, weak: 0, scores: [] }
-    c.total++
-    byCat.set(m.category, c)
-  }
-  for (const r of records) {
-    const m = meta.get(r.questionId)
-    if (m && r.status) byCat.get(m.category)![r.status]++
-  }
-  // 每道题只看最近一次面试的第一轮得分
-  const latest = new Map<number, number>()
-  for (const row of interviews) {
-    const score = row.turns[0]?.score
-    if (!latest.has(row.questionId) && typeof score === 'number') latest.set(row.questionId, score)
-  }
-  for (const [qid, score] of latest) {
-    const m = meta.get(qid)
-    if (m) byCat.get(m.category)!.scores.push(score)
-  }
-
-  const studied = [...byCat.values()].filter((c) => c.mastered + c.fuzzy + c.weak + c.scores.length > 0)
-  if (!studied.length) return { note: '候选人还没有学习记录，按面试目标出题，从基础题开始', dueToday: dueRows.length }
-
-  const avg = (s: number[]) => (s.length ? Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 10) / 10 : null)
-  return {
-    categories: studied
-      .map((c) => ({ category: c.category, total: c.total, mastered: c.mastered, fuzzy: c.fuzzy, weak: c.weak, interviewAvgScore: avg(c.scores) }))
-      .sort((a, b) => b.weak + b.fuzzy - (a.weak + a.fuzzy) || (a.interviewAvgScore ?? 10) - (b.interviewAvgScore ?? 10))
-      .slice(0, 15),
-    recentLowScores: [...latest]
-      .filter(([, s]) => s <= 5)
-      .slice(0, 6)
-      .map(([qid, score]) => ({ questionId: qid, title: meta.get(qid)?.title ?? '', score })),
-    dueToday: dueRows.length,
-  }
+  const profile = await learningProfile(ctx.userId)
+  return { ...profile, ...(profile.note ? { note: '候选人还没有学习记录，按面试目标出题，从基础题开始' } : {}) }
 }
 
 async function searchQuestionsTool(ctx: ToolContext, args: { query?: string; category?: string; difficulty?: number; limit?: number }) {
-  const meta = await questionMeta()
-  let ids: number[]
-  if (args.query) {
-    const found = await searchHandbook(args.query, { limit: 30, perQuestion: 1 })
-    ids = found.hits.map((h) => h.chunk.questionId)
-    // 刚部署、检索索引还没建好时，退回到按标题和正文的普通搜索
-    if (!ids.length) ids = (await searchQuestions(args.query, 30)).map((h) => h.id)
-  } else {
-    // 不按关键词时打乱顺序，同样的条件每次能出不同的题
-    ids = [...meta.keys()].sort(() => Math.random() - 0.5)
-  }
-
-  if (args.category) {
-    const wanted = args.category.toLowerCase()
-    const matches = (m: { category: string; categorySlug: string }) =>
-      m.category.toLowerCase().includes(wanted) || m.categorySlug === wanted
-    if (![...meta.values()].some(matches)) {
-      const names = [...new Set([...meta.values()].map((m) => m.category))].join('、')
-      return { error: `没有"${args.category}"这个分类，可用的分类有：${names}` }
-    }
-    ids = ids.filter((id) => matches(meta.get(id)!))
-  }
-  if (args.difficulty) ids = ids.filter((id) => meta.get(id)?.difficulty === args.difficulty)
-
-  const records = ids.length
-    ? await useDb()
-        .select({ questionId: tables.studyRecords.questionId, status: tables.studyRecords.status })
-        .from(tables.studyRecords)
-        .where(and(eq(tables.studyRecords.userId, ctx.userId), inArray(tables.studyRecords.questionId, ids.slice(0, 200))))
-    : []
-  const status = new Map(records.map((r) => [r.questionId, r.status]))
   const asked = new Set(ctx.state.asked.map((a) => a.questionId))
-  const questions = ids
-    .filter((id) => meta.has(id))
-    // 没问过的排前面，保持检索的相关度顺序
-    .sort((a, b) => Number(asked.has(a)) - Number(asked.has(b)))
-    .slice(0, args.limit ?? 6)
-    .map((id) => {
-      const m = meta.get(id)!
-      const s = status.get(id)
-      return { id, title: m.title, category: m.category, difficulty: m.difficulty, studyStatus: s ? STATUS_LABEL[s] : '没学过', askedInThisInterview: asked.has(id) }
-    })
-  return questions.length ? { questions } : { questions, note: '没有找到符合条件的题，换个关键词或去掉一些条件再试' }
+  const found = await findQuestions(ctx.userId, args, asked)
+  if (found.error) return { error: found.error }
+  return {
+    ...found,
+    questions: found.questions.map(({ path: _path, ...q }) => ({ ...q, askedInThisInterview: asked.has(q.id) })),
+  }
 }
 
 async function getReference(args: { question_id: number }) {

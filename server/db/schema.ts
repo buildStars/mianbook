@@ -235,7 +235,7 @@ export const reviewLogs = mysqlTable(
     /** 1 不会、2 模糊、3 会了、4 很熟 */
     rating: tinyint('rating').notNull(),
     /** review 复习页、page 题目页手动标记、interview 单题 AI 面试、mock 整场模拟面试 */
-    source: mysqlEnum('source', ['review', 'page', 'interview', 'mock', 'agent']).notNull(),
+    source: mysqlEnum('source', ['review', 'page', 'interview', 'mock', 'agent', 'mcp']).notNull(),
     /** 评分前的卡片；在题目页上短时间内改主意时，用它撤回上一次评分 */
     prevCard: json('prev_card').$type<StoredCard | null>(),
     createdAt: createdAt(),
@@ -333,4 +333,25 @@ export const agentSessions = mysqlTable(
     updatedAt: updatedAt(),
   },
   (t) => [index('agent_sessions_user_created_idx').on(t.userId, t.createdAt)],
+)
+
+/** 个人访问令牌：给 Claude Code、Cursor 这类 MCP 客户端用。只存令牌的 SHA-256，明文只在创建时显示一次 */
+export const apiTokens = mysqlTable(
+  'api_tokens',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    userId: int('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 64 }).notNull(),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    /** 令牌开头几位，列表里用来区分是哪一个 */
+    prefix: varchar('prefix', { length: 16 }).notNull(),
+    /** read：只能查询；write：还能记录答题结果（写进复习计划） */
+    scope: mysqlEnum('scope', ['read', 'write']).notNull(),
+    lastUsedAt: datetime('last_used_at', { mode: 'date' }),
+    expiresAt: datetime('expires_at', { mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('api_tokens_hash_unique').on(t.tokenHash), index('api_tokens_user_idx').on(t.userId)],
 )
