@@ -14,9 +14,23 @@ export const MOCK_TRACKS: MockTrack[] = [
   {
     id: 'frontend',
     name: '前端工程师',
-    desc: 'JS、TS、CSS、浏览器、框架、工程化',
+    desc: 'JS、CSS、浏览器、框架、工程化、手写题、SSR、跨端',
     focus: ['basics/javascript', 'basics/vue', 'basics/react'],
-    categories: ['basics/javascript', 'basics/typescript', 'basics/css', 'basics/browser', 'basics/network', 'basics/vue', 'basics/react', 'basics/build'],
+    categories: [
+      'basics/javascript',
+      'basics/handwriting',
+      'basics/typescript',
+      'basics/html',
+      'basics/css',
+      'basics/browser',
+      'basics/web-security',
+      'basics/network',
+      'basics/vue',
+      'basics/react',
+      'basics/ssr',
+      'basics/build',
+      'basics/cross-platform',
+    ],
   },
   {
     id: 'node-backend',
@@ -49,7 +63,7 @@ export const MOCK_TRACKS: MockTrack[] = [
     id: 'fullstack',
     name: 'AI 全栈',
     desc: '前端、Node.js、数据库加 AI 应用',
-    categories: ['basics/javascript', 'basics/vue', 'basics/react', 'basics/node', 'basics/mysql', 'basics/redis', 'ai/llm', 'ai/rag', 'ai/agent', 'engineering/streaming'],
+    categories: ['basics/javascript', 'basics/vue', 'basics/react', 'basics/ssr', 'basics/node', 'basics/mysql', 'basics/redis', 'ai/llm', 'ai/rag', 'ai/agent', 'engineering/streaming'],
   },
 ]
 
