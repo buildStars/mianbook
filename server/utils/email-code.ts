@@ -3,7 +3,7 @@ import { and, count, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { MailMessage } from './mailer'
 
-export type CodePurpose = 'register'
+export type CodePurpose = 'register' | 'reset'
 
 const CODE_TTL_MINUTES = 10
 const MAX_ATTEMPTS = 5
@@ -43,7 +43,8 @@ export async function issueEmailCode(event: H3Event, email: string, purpose: Cod
   const cooldown = Number(auth.codeCooldownSeconds) || 60
 
   const [[last], [perEmail], [perIpHour], [perIpDay], [total]] = await Promise.all([
-    db.select({ createdAt: t.createdAt }).from(t).where(eq(t.email, email)).orderBy(desc(t.id)).limit(1),
+    // 冷却按用途分开算（刚注册完也能马上申请重置密码）；每小时的总量不分用途
+    db.select({ createdAt: t.createdAt }).from(t).where(and(eq(t.email, email), eq(t.purpose, purpose))).orderBy(desc(t.id)).limit(1),
     db.select({ n: count() }).from(t).where(and(eq(t.email, email), gte(t.createdAt, new Date(now - HOUR)))),
     ip ? db.select({ n: count() }).from(t).where(and(eq(t.ip, ip), gte(t.createdAt, new Date(now - HOUR)))) : [{ n: 0 }],
     ip ? db.select({ n: count() }).from(t).where(and(eq(t.ip, ip), gte(t.createdAt, new Date(now - DAY)))) : [{ n: 0 }],
@@ -65,7 +66,7 @@ export async function issueEmailCode(event: H3Event, email: string, purpose: Cod
     .$returningId()
 
   try {
-    await sendMail(codeMail(email, code))
+    await sendMail(codeMail(email, code, purpose))
   } catch (error) {
     // 没发出去的验证码不占发送次数
     await db.delete(t).where(eq(t.id, created!.id))
@@ -108,19 +109,21 @@ export async function consumeEmailCode(email: string, purpose: CodePurpose, code
   if (!result.affectedRows) throw createError({ statusCode: 400, message: '验证码已使用，请重新获取' })
 }
 
-function codeMail(to: string, code: string): MailMessage {
+function codeMail(to: string, code: string, purpose: CodePurpose): MailMessage {
   const site = String(useRuntimeConfig().public.siteName || '全栈面试手册')
+  const action = purpose === 'reset' ? `重置${site}的密码` : `注册${site}`
+  const label = purpose === 'reset' ? '重置密码验证码' : '注册验证码'
   return {
     to,
-    subject: `${code} 是你的注册验证码 · ${site}`,
+    subject: `${code} 是你的${label} · ${site}`,
     text: [
-      `你正在注册${site}，验证码是：${code}`,
+      `你正在${action}，验证码是：${code}`,
       `${CODE_TTL_MINUTES} 分钟内有效，只能使用一次。`,
       '如果这不是你本人的操作，请忽略这封邮件，不要把验证码告诉别人。',
     ].join('\n\n'),
     html: `<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1c1b19;background:#faf9f6">
   <div style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:8px;background:#c8372d;color:#fff;font-weight:700;font-size:20px">面</div>
-  <p style="margin:24px 0 8px;font-size:15px">你正在注册${site}，验证码是：</p>
+  <p style="margin:24px 0 8px;font-size:15px">你正在${action}，验证码是：</p>
   <p style="margin:0 0 20px;font-size:34px;font-weight:700;letter-spacing:8px;color:#1f3fd6">${code}</p>
   <p style="margin:0;font-size:13px;color:#56524c;line-height:1.8">${CODE_TTL_MINUTES} 分钟内有效，只能使用一次。<br>如果这不是你本人的操作，请忽略这封邮件，不要把验证码告诉别人。</p>
 </div>`,

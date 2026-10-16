@@ -37,6 +37,8 @@ export const users = mysqlTable(
     role: mysqlEnum('role', ['admin', 'user']).notNull().default('user'),
     /** 邮箱验证通过的时间；开启注册验证码之前注册的账号为空 */
     emailVerifiedAt: datetime('email_verified_at', { mode: 'date' }),
+    /** 会话版本：改密码时加 1，旧会话里的版本对不上就失效（让其他设备下线） */
+    sessionVersion: int('session_version').notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('users_email_unique').on(t.email)],
@@ -354,4 +356,16 @@ export const apiTokens = mysqlTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('api_tokens_hash_unique').on(t.tokenHash), index('api_tokens_user_idx').on(t.userId)],
+)
+
+/** 登录失败记录：按账号、IP 统计失败次数，防止暴力破解和撞库。只保留一天 */
+export const failedLogins = mysqlTable(
+  'failed_logins',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    email: varchar('email', { length: 191 }).notNull(),
+    ip: varchar('ip', { length: 45 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('failed_logins_email_idx').on(t.email, t.createdAt), index('failed_logins_ip_idx').on(t.ip, t.createdAt)],
 )

@@ -28,7 +28,7 @@ async function admin() {
 describe('注册邮箱验证码', () => {
   it('配置了发信时，注册页需要验证码', async () => {
     const { data } = await new Client().json('/api/auth/options')
-    expect(data).toEqual({ emailCode: true })
+    expect(data).toEqual({ emailCode: true, passwordReset: true })
   })
 
   it('收到验证码后才能注册，邮箱标记为已验证', async () => {
@@ -159,7 +159,7 @@ describe('后台注册设置', () => {
 
     const off = await a.c.json('/api/admin/settings/auth', { method: 'PUT', body: { requireEmailCode: false } })
     expect(off).toMatchObject({ status: 200, data: { emailCode: false } })
-    expect((await new Client().json('/api/auth/options')).data).toEqual({ emailCode: false })
+    expect((await new Client().json('/api/auth/options')).data).toEqual({ emailCode: false, passwordReset: true })
 
     // 关闭后不用验证码也能注册，邮箱不算已验证；也不再发验证码
     const email = randomEmail('noverify')
@@ -175,7 +175,7 @@ describe('后台注册设置', () => {
 
     const on = await a.c.json('/api/admin/settings/auth', { method: 'PUT', body: { requireEmailCode: true } })
     expect(on.data).toEqual({ emailCode: true })
-    expect((await new Client().json('/api/auth/options')).data).toEqual({ emailCode: true })
+    expect((await new Client().json('/api/auth/options')).data).toEqual({ emailCode: true, passwordReset: true })
   })
 
   it('给管理员发测试邮件', async () => {
@@ -190,6 +190,6 @@ describe('后台注册设置', () => {
     await c.register('plain')
     expect((await c.request('/api/admin/settings/auth', { method: 'PUT', body: { requireEmailCode: false } })).status).toBe(403)
     expect((await c.request('/api/admin/mail/test', { method: 'POST', body: {} })).status).toBe(403)
-    expect((await new Client().json('/api/auth/options')).data).toEqual({ emailCode: true })
+    expect((await new Client().json('/api/auth/options')).data).toEqual({ emailCode: true, passwordReset: true })
   })
 })

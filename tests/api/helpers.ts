@@ -85,14 +85,17 @@ export class Client {
   /** 注册一个新用户并保持登录；邮箱随机，测试之间互不影响。站点要求验证码时先从发件箱取验证码 */
   async register(prefix = 'user') {
     const email = randomEmail(prefix)
+    const password = crypto.randomBytes(12).toString('hex')
     const sent = await this.requestCode(email)
     if (sent.status !== 200 && sent.status !== 400) throw new Error(`发验证码失败：${sent.status} ${JSON.stringify(sent.data)}`)
     const code = sent.status === 200 ? latestCode(email) : undefined
-    const { status, data } = await this.json('/api/auth/register', {
-      body: { email, name: prefix, password: crypto.randomBytes(12).toString('hex'), code },
-    })
+    const { status, data } = await this.json('/api/auth/register', { body: { email, name: prefix, password, code } })
     if (status !== 200) throw new Error(`注册失败：${status} ${JSON.stringify(data)}`)
-    return data as { id: number; email: string; role: 'admin' | 'user' }
+    return { ...(data as { id: number; email: string; role: 'admin' | 'user' }), password }
+  }
+
+  login(email: string, password: string) {
+    return this.json('/api/auth/login', { body: { email, password } })
   }
 
   answer(body: { questionId?: number; sessionId?: number; interviewId?: number; answer: string }) {

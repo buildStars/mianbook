@@ -38,7 +38,5 @@ export default defineEventHandler(async (event) => {
       emailVerifiedAt: verify ? new Date() : null,
     })
     .$returningId()
-  const user = { id: created!.id, name: body.name, email: body.email, role }
-  await setUserSession(event, { user })
-  return user
+  return startUserSession(event, { id: created!.id, name: body.name, email: body.email, role, sessionVersion: 0 })
 })

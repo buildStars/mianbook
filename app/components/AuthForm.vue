@@ -10,9 +10,9 @@ const loading = ref(false)
 const errorMsg = ref('')
 
 // 注册是否需要邮箱验证码，由服务端决定（配置了发信并且后台开着）
-const { data: options } = useFetch<{ emailCode: boolean }>('/api/auth/options', {
+const { data: options } = useFetch<{ emailCode: boolean; passwordReset: boolean }>('/api/auth/options', {
   key: 'auth-options',
-  default: () => ({ emailCode: false }),
+  default: () => ({ emailCode: false, passwordReset: false }),
 })
 const needCode = computed(() => props.mode === 'register' && options.value.emailCode)
 
@@ -124,6 +124,13 @@ async function submit() {
               :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
               :placeholder="mode === 'register' ? '至少 8 位' : '输入密码'"
             />
+            <NuxtLink
+              v-if="mode === 'login' && options.passwordReset"
+              :to="{ path: '/forgot-password', query: form.email ? { email: form.email.trim() } : {} }"
+              class="forgot"
+            >
+              忘记密码？
+            </NuxtLink>
           </ElFormItem>
           <p v-if="errorMsg" class="error" role="alert">{{ errorMsg }}</p>
           <button type="submit" class="btn btn-primary btn-lg submit" :disabled="loading">
@@ -316,6 +323,11 @@ h1 {
   font-size: 12px;
   line-height: 1.6;
   color: var(--c-text-3);
+}
+
+.forgot {
+  margin: 6px 0 0 auto;
+  font-size: 13px;
 }
 
 .error {
