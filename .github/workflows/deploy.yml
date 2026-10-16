@@ -1,0 +1,52 @@
+# 发布到服务器：推送 v 开头的 tag（如 v1.2.0）或在 Actions 页面手动运行。先跑完整的测试，通过后才发布。
+# 需要在仓库的 Settings → Environments → production 里配置：
+#   secrets.DEPLOY_SSH_KEY      专门给 CI 用的 SSH 私钥（公钥加到服务器的 ~/.ssh/authorized_keys）
+#   secrets.DEPLOY_KNOWN_HOSTS  ssh-keyscan 服务器得到的主机公钥，防止中间人
+#   secrets.DEPLOY_HOST         如 ubuntu@1.2.3.4
+#   vars.DEPLOY_DOMAIN          如 example.com
+name: Deploy
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      import:
+        description: 同时把 content/ 的题目导入线上数据库（线上更新的题不会被覆盖）
+        type: boolean
+        default: false
+
+# 同一时间只跑一个发布，后来的排队，不取消正在进行的
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 准备 SSH 和发布配置
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'DEPLOY_HOST=%s\nDEPLOY_KEY=~/.ssh/deploy\nDEPLOY_DOMAIN=%s\n' "$HOST" "$DOMAIN" > .env.deploy
+      - name: 发布
+        run: node scripts/deploy.mjs ${{ inputs.import && '--import' || '' }}
+      - name: 检查线上服务
+        run: curl -fsS "https://${{ vars.DEPLOY_DOMAIN }}/api/health"

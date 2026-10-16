@@ -1,0 +1,50 @@
+# 每次推送和 PR：题目格式检查、类型检查、单元测试和接口测试（接口测试连一个临时的 MySQL）
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 发布流程先调用这里，测试通过才发布
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          # 只在 CI 的临时容器里用，测试连 root 账号建独立的测试库
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        ports: ['3307:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: 题目格式
+        run: node scripts/check-content.mjs
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 单元测试和接口测试
+        run: npx vitest run
+        env:
+          MYSQL_PORT: 3307
+      - name: 接口测试失败时上传服务端日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: .output-test/server.log
+          if-no-files-found: ignore

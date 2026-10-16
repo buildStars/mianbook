@@ -209,6 +209,11 @@ templates/           新题目的 Markdown 模板和写作规范（writing-guide
 
 **备份**：服务器每天 03:30 自动备份数据库到 `/opt/handbook/backups`，保留 14 天。`npm run deploy:backup` 会立即备份一次，并下载到本地的 `backups/` 目录。
 
+**CI/CD（GitHub Actions）**：
+- `.github/workflows/ci.yml`：推送到 main 和每个 PR 都会跑题目格式检查、类型检查、单元测试和接口测试（用服务容器起一个临时 MySQL）。接口测试失败时会上传服务端日志
+- `.github/workflows/deploy.yml`：推送 `v` 开头的 tag（如 `git tag v1.3.0 && git push origin v1.3.0`）或在 Actions 页面手动运行时，先跑完整的测试，通过后用 `scripts/deploy.mjs` 发布，最后访问 `/api/health` 确认服务正常；手动运行时可以勾选"同时导入题目"
+- 发布需要在仓库的 Settings → Environments 里建 `production` 环境，配置 `DEPLOY_SSH_KEY`（CI 专用的 SSH 私钥）、`DEPLOY_KNOWN_HOSTS`（`ssh-keyscan 服务器IP` 的输出）、`DEPLOY_HOST`（如 `ubuntu@1.2.3.4`）三个 secret 和 `DEPLOY_DOMAIN` 变量。可以给这个环境加"需要审批"，发布前要人点一下确认
+
 **常用运维命令**（在服务器的 `/opt/handbook` 目录里执行）：
 
 | 命令 | 作用 |
