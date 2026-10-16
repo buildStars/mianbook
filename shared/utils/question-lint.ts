@@ -8,7 +8,7 @@ export const QUESTION_TAGS = ['高频', '原理', '实践', '性能优化', '场
 const BANNED = ['首先', '其次', '总之', '值得注意的是', '综上所述', '众所周知']
 const REQUIRED_SECTIONS = ['详细解析', '面试官可能追问', '易错点']
 // 和 server/utils/markdown.ts 的 LANGS 对应（含 Shiki 的常用别名），其他语言不会高亮
-const LANGS = new Set(['js', 'javascript', 'ts', 'typescript', 'jsx', 'tsx', 'vue', 'vue-html', 'html', 'css', 'json', 'bash', 'sh', 'shell', 'nginx', 'python', 'py', 'sql', 'yaml', 'yml', 'diff', 'markdown', 'md', 'java', 'go', 'lua', 'xml', 'properties', 'ini', 'toml', 'dockerfile', 'text'])
+const LANGS = new Set(['js', 'javascript', 'ts', 'typescript', 'jsx', 'tsx', 'vue', 'vue-html', 'html', 'css', 'scss', 'less', 'json', 'bash', 'sh', 'shell', 'nginx', 'python', 'py', 'sql', 'yaml', 'yml', 'diff', 'markdown', 'md', 'java', 'go', 'c', 'lua', 'xml', 'properties', 'ini', 'toml', 'dockerfile', 'text'])
 
 export interface LintIssue {
   /** 文件里的行号（从 1 开始）；整篇的问题没有行号 */
