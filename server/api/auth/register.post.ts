@@ -5,6 +5,8 @@ const schema = z.object({
   email: z.string().trim().toLowerCase().max(191).email('邮箱格式不正确'),
   name: z.string().trim().min(1, '请填写昵称').max(32, '昵称最多 32 个字'),
   password: z.string().min(8, '密码至少 8 位').max(72, '密码最多 72 位'),
+  /** 邮箱验证码；后台关闭了注册验证或没有配置发信时不需要 */
+  code: z.string().trim().optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -14,13 +16,27 @@ export default defineEventHandler(async (event) => {
   const [existing] = await db.select({ id: tables.users.id }).from(tables.users).where(eq(tables.users.email, body.email))
   if (existing) throw createError({ statusCode: 409, message: '这个邮箱已经注册过了' })
 
+  // 先确认邮箱确实是本人的，防止用随便编的邮箱批量注册
+  const verify = emailCodeRequired()
+  if (verify) {
+    if (!body.code) throw createError({ statusCode: 400, message: '请填写邮箱验证码' })
+    if (!/^\d{6}$/.test(body.code)) throw createError({ statusCode: 400, message: '验证码是 6 位数字' })
+    await consumeEmailCode(body.email, 'register', body.code)
+  }
+
   // 第一个注册的账号自动成为管理员
   const [stats] = await db.select({ total: count() }).from(tables.users)
   const role: 'admin' | 'user' = stats?.total === 0 ? 'admin' : 'user'
 
   const [created] = await db
     .insert(tables.users)
-    .values({ email: body.email, name: body.name, passwordHash: await hashPassword(body.password), role })
+    .values({
+      email: body.email,
+      name: body.name,
+      passwordHash: await hashPassword(body.password),
+      role,
+      emailVerifiedAt: verify ? new Date() : null,
+    })
     .$returningId()
   const user = { id: created!.id, name: body.name, email: body.email, role }
   await setUserSession(event, { user })

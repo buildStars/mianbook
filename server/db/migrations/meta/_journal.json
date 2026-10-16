@@ -29,6 +29,13 @@
       "when": 1791734053532,
       "tag": "0003_settings_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1792151533967,
+      "tag": "0004_email_codes",
+      "breakpoints": true
     }
   ]
 }

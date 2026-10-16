@@ -18,5 +18,12 @@ export default defineEventHandler(async (event) => {
       overridden: aiOverrides(),
     },
     contentSync: Boolean(contentRoot()),
+    auth: {
+      /** 现在注册是否需要邮箱验证码 */
+      emailCode: emailCodeRequired(),
+      /** 后台的开关；null 表示没设置过（配置了发信就默认开启） */
+      requireEmailCode: authSettings().requireEmailCode ?? null,
+      mail: mailStatus(),
+    },
   }
 })

@@ -12,6 +12,7 @@ interface UserRow {
   interviews: number
   aiCalls30d: number
   lastActiveAt: string | null
+  emailVerified: boolean
 }
 
 const { user: me } = useUserSession()
@@ -43,6 +44,8 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
       <template #desc>共 <strong class="a-num">{{ users.length }}</strong> 位用户，其中 {{ admins }} 位管理员。不能修改自己的角色。</template>
     </AdminPageHead>
 
+    <AdminRegisterSettings />
+
     <div class="a-card list">
       <div class="filters">
         <ElInput v-model="q" placeholder="按昵称或邮箱搜索" clearable class="search">
@@ -56,7 +59,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
               <span class="avatar serif" :class="{ admin: row.role === 'admin' }" aria-hidden="true">{{ row.name.slice(0, 1) }}</span>
               <span class="who-text">
                 <strong>{{ row.name }}<span v-if="row.id === me?.id" class="me">我</span></strong>
-                <span>{{ row.email }}</span>
+                <span>{{ row.email }}<em v-if="row.emailVerified" class="verified" title="注册时通过了邮箱验证">已验证</em></span>
               </span>
             </div>
           </template>
@@ -165,6 +168,13 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
   font-size: 11px;
   font-weight: 600;
   color: var(--c-brand);
+}
+
+.verified {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--c-success);
 }
 
 .n {

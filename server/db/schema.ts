@@ -33,9 +33,30 @@ export const users = mysqlTable(
     name: varchar('name', { length: 64 }).notNull(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     role: mysqlEnum('role', ['admin', 'user']).notNull().default('user'),
+    /** 邮箱验证通过的时间；开启注册验证码之前注册的账号为空 */
+    emailVerifiedAt: datetime('email_verified_at', { mode: 'date' }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('users_email_unique').on(t.email)],
+)
+
+/** 邮箱验证码：只存哈希；同时用来限制同一个邮箱、同一个 IP 的发送频率 */
+export const emailCodes = mysqlTable(
+  'email_codes',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    email: varchar('email', { length: 191 }).notNull(),
+    /** register 注册 */
+    purpose: varchar('purpose', { length: 16 }).notNull(),
+    codeHash: varchar('code_hash', { length: 64 }).notNull(),
+    ip: varchar('ip', { length: 45 }),
+    /** 输错的次数，超过上限后这个验证码作废 */
+    attempts: tinyint('attempts').notNull().default(0),
+    expiresAt: datetime('expires_at', { mode: 'date' }).notNull(),
+    usedAt: datetime('used_at', { mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('email_codes_email_idx').on(t.email, t.createdAt), index('email_codes_ip_idx').on(t.ip, t.createdAt)],
 )
 
 /** 部分：全栈基础、LLM 与 Agent、AI 工程化…… */

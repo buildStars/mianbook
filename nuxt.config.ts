@@ -65,6 +65,27 @@ export default defineNuxtConfig({
       // 用户自带 Key 时，除预设服务商外额外允许的域名，逗号分隔，如 api.example.com
       extraHosts: '',
     },
+    // 发信（注册验证码）：SMTP 配置，例如 QQ 邮箱 smtp.qq.com、465 端口、授权码。
+    // 云服务器一般封了 25 端口，要用 465（SSL）或 587。outboxDir 设置后不真正发信，而是把邮件写成文件，用于本地开发和测试
+    mail: {
+      host: '',
+      port: 465,
+      user: '',
+      pass: '',
+      // 发件人，例如 全栈面试手册 <xxx@qq.com>；不填时用 user
+      from: '',
+      outboxDir: '',
+    },
+    auth: {
+      // 部署在反向代理（Caddy）后面时设为 true，用 X-Forwarded-For 识别用户 IP
+      trustProxy: false,
+      // 验证码的发送限制
+      codeCooldownSeconds: 60,
+      codePerEmailHourly: 5,
+      codePerIpHourly: 10,
+      codePerIpDaily: 30,
+      codeDailyTotal: 500,
+    },
     public: {
       siteName: '全栈面试手册',
     },

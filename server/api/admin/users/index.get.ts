@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const since30 = new Date(Date.now() - 30 * 86_400_000)
   const [users, records, interviews, aiCalls, ...lastSeen] = await Promise.all([
     db
-      .select({ id: t.users.id, email: t.users.email, name: t.users.name, role: t.users.role, createdAt: t.users.createdAt })
+      .select({ id: t.users.id, email: t.users.email, name: t.users.name, role: t.users.role, createdAt: t.users.createdAt, emailVerifiedAt: t.users.emailVerifiedAt })
       .from(t.users)
       .orderBy(asc(t.users.id)),
     db
@@ -37,9 +37,10 @@ export default defineEventHandler(async (event) => {
     const at = r.at ? new Date(r.at) : null
     if (at && (!lastActive.has(r.userId) || at > lastActive.get(r.userId)!)) lastActive.set(r.userId, at)
   }
-  return users.map((u) => ({
+  return users.map(({ emailVerifiedAt, ...u }) => ({
     ...u,
     createdAt: u.createdAt.toISOString(),
+    emailVerified: Boolean(emailVerifiedAt),
     mastered: mastered.get(u.id) ?? 0,
     interviews: interviewCount.get(u.id) ?? 0,
     aiCalls30d: aiCount.get(u.id) ?? 0,

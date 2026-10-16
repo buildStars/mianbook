@@ -5,9 +5,56 @@ const route = useRoute()
 const { fetch: refreshSession } = useUserSession()
 const { all } = useOutline()
 
-const form = reactive({ email: '', name: '', password: '' })
+const form = reactive({ email: '', name: '', password: '', code: '' })
 const loading = ref(false)
 const errorMsg = ref('')
+
+// 注册是否需要邮箱验证码，由服务端决定（配置了发信并且后台开着）
+const { data: options } = useFetch<{ emailCode: boolean }>('/api/auth/options', {
+  key: 'auth-options',
+  default: () => ({ emailCode: false }),
+})
+const needCode = computed(() => props.mode === 'register' && options.value.emailCode)
+
+const sending = ref(false)
+const countdown = ref(0)
+const codeHint = ref('')
+let timer: ReturnType<typeof setInterval> | undefined
+
+function startCountdown(seconds: number) {
+  countdown.value = Math.ceil(seconds)
+  clearInterval(timer)
+  timer = setInterval(() => {
+    countdown.value -= 1
+    if (countdown.value <= 0) clearInterval(timer)
+  }, 1000)
+}
+onBeforeUnmount(() => clearInterval(timer))
+
+async function sendCode() {
+  errorMsg.value = ''
+  const email = form.email.trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errorMsg.value = '请先填写正确的邮箱'
+    return
+  }
+  sending.value = true
+  try {
+    const res = await $fetch<{ cooldown: number; expiresInMinutes: number }>('/api/auth/email-code', {
+      method: 'POST',
+      body: { email, purpose: 'register' },
+    })
+    codeHint.value = `验证码已发送到 ${email}，${res.expiresInMinutes} 分钟内有效。没收到的话看看垃圾邮件`
+    startCountdown(res.cooldown)
+  } catch (error: any) {
+    errorMsg.value = error?.data?.message ?? '发送失败，请稍后再试'
+    // 发送太频繁时，按服务端给的等待时间倒计时
+    const retry = Number(error?.data?.data?.retryAfter)
+    if (retry > 0 && retry <= 120) startCountdown(retry)
+  } finally {
+    sending.value = false
+  }
+}
 
 const redirect = computed(() => {
   const target = String(route.query.redirect ?? '/')
@@ -57,6 +104,15 @@ async function submit() {
           <ElFormItem label="邮箱">
             <ElInput v-model="form.email" type="email" autocomplete="email" placeholder="you@example.com" />
           </ElFormItem>
+          <ElFormItem v-if="needCode" label="邮箱验证码">
+            <div class="code-row">
+              <ElInput v-model="form.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" />
+              <button type="button" class="btn code-btn" :disabled="sending || countdown > 0" @click="sendCode">
+                {{ countdown > 0 ? `${countdown} 秒后重发` : sending ? '发送中…' : '获取验证码' }}
+              </button>
+            </div>
+            <p v-if="codeHint" class="code-hint">{{ codeHint }}</p>
+          </ElFormItem>
           <ElFormItem v-if="mode === 'register'" label="昵称">
             <ElInput v-model="form.name" maxlength="32" autocomplete="nickname" placeholder="怎么称呼你" />
           </ElFormItem>
@@ -82,7 +138,6 @@ async function submit() {
             已有账号？<NuxtLink :to="{ path: '/login', query: route.query }">直接登录</NuxtLink>
           </template>
         </p>
-        <p v-if="mode === 'register'" class="tip">第一个注册的账号会自动成为管理员。</p>
       </main>
     </div>
   </div>
@@ -240,6 +295,29 @@ h1 {
   margin-top: 4px;
 }
 
+.code-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.code-row :deep(.el-input) {
+  flex: 1;
+}
+
+.code-btn {
+  flex: none;
+  min-width: 124px;
+}
+
+.code-hint {
+  width: 100%;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-3);
+}
+
 .error {
   margin: -6px 0 14px;
   font-size: 13px;
@@ -255,13 +333,6 @@ h1 {
 
 .switch a {
   font-weight: 600;
-}
-
-.tip {
-  margin: 8px 0 0;
-  font-size: 12px;
-  text-align: center;
-  color: var(--c-text-3);
 }
 
 @media (max-width: 820px) {

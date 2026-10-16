@@ -31,6 +31,13 @@ NUXT_AI_API_KEY=
 NUXT_AI_BASE_URL=https://api.moonshot.cn/v1
 NUXT_AI_MODEL=kimi-k2-turbo-preview
 NUXT_AI_DAILY_LIMIT=30
+
+# 发信（注册验证码），例如 QQ 邮箱：smtp.qq.com、465、邮箱地址、在邮箱设置里生成的授权码
+NUXT_MAIL_HOST=
+NUXT_MAIL_PORT=465
+NUXT_MAIL_USER=
+NUXT_MAIL_PASS=
+NUXT_MAIL_FROM=
 EOF
   echo "已生成 /opt/handbook/.env"
 fi

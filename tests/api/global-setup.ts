@@ -2,7 +2,7 @@
  * 接口测试的全局准备：
  * 1. 重建测试库 handbook_test（用本机 MySQL 的 root 账号，只监听 127.0.0.1），执行迁移并导入题库
  * 2. 构建一份测试专用的产物（.output-test），代码没变时跳过构建
- * 3. 启动模拟大模型和服务，把地址传给测试
+ * 3. 启动模拟大模型和服务（邮件写到临时发件箱），把地址传给测试
  * 不会读写正式库，也不会影响正在运行的开发服务器
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
@@ -28,6 +28,7 @@ declare module 'vitest' {
     dbUrl: string
     dailyLimit: number
     contentDir: string
+    outboxDir: string
   }
 }
 
@@ -89,7 +90,10 @@ export default async function setup(project: TestProject) {
   const contentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'handbook-content-'))
   fs.cpSync(path.join(root, 'content'), contentDir, { recursive: true })
 
-  // 4. 启动模拟大模型和服务
+  // 4. 邮件不真发，写到临时发件箱，测试从这里读验证码
+  const outboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'handbook-outbox-'))
+
+  // 5. 启动模拟大模型和服务
   const llm = await startMockLlm()
   const port = await freePort()
   const server: ChildProcess = spawn(process.execPath, [entry], {
@@ -107,6 +111,11 @@ export default async function setup(project: TestProject) {
       NUXT_AI_DAILY_LIMIT: String(DAILY_LIMIT),
       NUXT_AI_EXTRA_HOSTS: '',
       NUXT_CONTENT_DIR: contentDir,
+      NUXT_MAIL_OUTBOX_DIR: outboxDir,
+      NUXT_MAIL_FROM: '测试 <noreply@example.test>',
+      // 测试请求都来自本机：用 X-Forwarded-For 给每次注册分配不同的 IP，按 IP 限流的逻辑也能测
+      NUXT_AUTH_TRUST_PROXY: 'true',
+      NUXT_AUTH_CODE_DAILY_TOTAL: '100000',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -132,6 +141,7 @@ export default async function setup(project: TestProject) {
   project.provide('dbUrl', TEST_DB_URL)
   project.provide('dailyLimit', DAILY_LIMIT)
   project.provide('contentDir', contentDir)
+  project.provide('outboxDir', outboxDir)
 
   return async () => {
     server.kill()
@@ -139,5 +149,6 @@ export default async function setup(project: TestProject) {
     // 服务端日志留着排查失败的测试
     fs.writeFileSync(path.join(root, '.output-test', 'server.log'), logs)
     fs.rmSync(contentDir, { recursive: true, force: true })
+    fs.rmSync(outboxDir, { recursive: true, force: true })
   }
 }

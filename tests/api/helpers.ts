@@ -1,17 +1,46 @@
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import { inject } from 'vitest'
 import mysql from 'mysql2/promise'
 
 export const baseUrl = () => inject('baseUrl')
 
-/** 带 cookie 的客户端，一个实例相当于一个登录的浏览器 */
+export const randomEmail = (prefix = 'user') => `${prefix}-${crypto.randomBytes(4).toString('hex')}@example.test`
+
+/** 随机的内网 IP，通过 X-Forwarded-For 传给服务（测试服务开着 trustProxy） */
+export const randomIp = () => `10.${crypto.randomInt(256)}.${crypto.randomInt(256)}.${crypto.randomInt(1, 255)}`
+
+/** 发件箱里最近发给这个邮箱的邮件 */
+export function latestMail(email: string): { to: string; subject: string; text: string; html?: string } {
+  const dir = inject('outboxDir')
+  const suffix = `-${email.replace(/[^\w.@-]/g, '_')}.json`
+  const name = fs.readdirSync(dir).filter((f) => f.endsWith(suffix)).sort().at(-1)
+  if (!name) throw new Error(`发件箱里没有发给 ${email} 的邮件`)
+  return JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'))
+}
+
+/** 最近发给这个邮箱的验证码 */
+export function latestCode(email: string): string {
+  const code = latestMail(email).subject.match(/^(\d{6}) /)?.[1]
+  if (!code) throw new Error(`邮件里没有验证码：${email}`)
+  return code
+}
+
+/** 带 cookie 的客户端，一个实例相当于一个登录的浏览器；每个实例有自己的 IP */
 export class Client {
   cookie = ''
+  ip = randomIp()
 
   async request(path: string, options: { method?: string; body?: unknown; headers?: Record<string, string> } = {}) {
     const res = await fetch(baseUrl() + path, {
       method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
-      headers: { 'Content-Type': 'application/json', ...(this.cookie ? { cookie: this.cookie } : {}), ...options.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': this.ip,
+        ...(this.cookie ? { cookie: this.cookie } : {}),
+        ...options.headers,
+      },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })
     const set = res.headers.get('set-cookie')
@@ -48,11 +77,19 @@ export class Client {
     }
   }
 
-  /** 注册一个新用户并保持登录；邮箱随机，测试之间互不影响 */
+  /** 申请注册验证码 */
+  requestCode(email: string) {
+    return this.json('/api/auth/email-code', { body: { email, purpose: 'register' } })
+  }
+
+  /** 注册一个新用户并保持登录；邮箱随机，测试之间互不影响。站点要求验证码时先从发件箱取验证码 */
   async register(prefix = 'user') {
-    const email = `${prefix}-${crypto.randomBytes(4).toString('hex')}@example.test`
+    const email = randomEmail(prefix)
+    const sent = await this.requestCode(email)
+    if (sent.status !== 200 && sent.status !== 400) throw new Error(`发验证码失败：${sent.status} ${JSON.stringify(sent.data)}`)
+    const code = sent.status === 200 ? latestCode(email) : undefined
     const { status, data } = await this.json('/api/auth/register', {
-      body: { email, name: prefix, password: crypto.randomBytes(12).toString('hex') },
+      body: { email, name: prefix, password: crypto.randomBytes(12).toString('hex'), code },
     })
     if (status !== 200) throw new Error(`注册失败：${status} ${JSON.stringify(data)}`)
     return data as { id: number; email: string; role: 'admin' | 'user' }

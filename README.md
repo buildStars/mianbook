@@ -55,6 +55,31 @@ npm run db:start
 
 换成 DeepSeek、通义千问等服务商时，修改 `NUXT_AI_BASE_URL` 和 `NUXT_AI_MODEL` 即可。
 
+## 注册邮箱验证码
+
+配置了发信邮箱后，注册时要先填邮件里的 6 位验证码，防止用随便编的邮箱批量注册。没配置时注册照常，不需要验证码。已有账号不受影响，登录也不需要验证码。
+
+以 QQ 邮箱为例：
+
+1. 登录 QQ 邮箱网页版，在设置里找到"POP3/IMAP/SMTP 服务"并开启，按提示生成授权码（授权码不是 QQ 密码）
+2. 在 `.env` 里填写：
+
+   ```bash
+   NUXT_MAIL_HOST=smtp.qq.com
+   NUXT_MAIL_PORT=465
+   NUXT_MAIL_USER=你的邮箱@qq.com
+   NUXT_MAIL_PASS=刚才生成的授权码
+   NUXT_MAIL_FROM=全栈面试手册 <你的邮箱@qq.com>
+   ```
+
+3. 重启应用，到"管理后台 → 用户"点"发测试邮件给我"，收到邮件就说明配置好了
+
+云服务器一般封了 25 端口，要用 465（SSL）或 587。QQ 邮箱要求发件人地址和 `NUXT_MAIL_USER` 一致。发信出问题时，可以在"管理后台 → 用户"里临时关掉"注册需要邮箱验证码"，不用改配置。
+
+验证码 10 分钟内有效，输错 5 次作废。发送频率有限制：同一个邮箱 60 秒一次、一小时 5 次；同一个 IP 一小时 10 次、一天 30 次；全站一天 500 封（保护发信邮箱不被服务商限制）。这些数字可以用 `NUXT_AUTH_CODE_COOLDOWN_SECONDS`、`NUXT_AUTH_CODE_PER_EMAIL_HOURLY`、`NUXT_AUTH_CODE_PER_IP_HOURLY`、`NUXT_AUTH_CODE_PER_IP_DAILY`、`NUXT_AUTH_CODE_DAILY_TOTAL` 调整。
+
+本地开发想试验证码又不想真发邮件时，设置 `NUXT_MAIL_OUTBOX_DIR=.data/outbox`，邮件会写成 JSON 文件放在这个目录里。
+
 ## 后台修改和 content/ 目录
 
 `content/` 里的 Markdown 是题库的源文件，可以用 Git 管理。在管理后台新建、修改、移动、删除题目或分类时，改动会同时写回 `content/` 下对应的文件和 `outline.json`，所以之后再 `db:import` 不会冲掉后台的修改。部署环境里没有 `content/` 目录时只保存到数据库（后台侧栏会显示"仅保存到数据库"），记得定期 `db:export` 备份。
@@ -124,7 +149,7 @@ templates/           新题目的 Markdown 模板和写作规范（writing-guide
 
 4. 执行 `npm run deploy -- --import`：上传代码，在服务器上构建镜像，建表并导入 `content/` 里的题目
 
-第一次部署时，会在服务器的 `/opt/handbook/.env` 里随机生成数据库密码和登录密钥。AI Key 也填在这个文件里，填好后在服务器上执行 `cd /opt/handbook && docker compose up -d app` 生效。
+第一次部署时，会在服务器的 `/opt/handbook/.env` 里随机生成数据库密码和登录密钥。AI Key 和发信邮箱（`NUXT_MAIL_*`，见上面的"注册邮箱验证码"）也填在这个文件里，填好后在服务器上执行 `cd /opt/handbook && docker compose up -d app` 生效。
 
 **以后发布**：执行 `npm run deploy`。只发布已经提交的代码，有未提交的修改会提示，但不会上传。上一版代码保留在服务器的 `/opt/handbook/src.prev`。
 
