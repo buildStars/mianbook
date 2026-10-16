@@ -51,6 +51,12 @@ function go(hit?: SearchHit) {
   navigateTo(hit.path)
 }
 
+function askAi() {
+  const q = query.value.trim()
+  open.value = false
+  navigateTo({ path: '/ask', query: { q } })
+}
+
 function move(step: number) {
   if (!results.value.length) return
   active.value = (active.value + step + results.value.length) % results.value.length
@@ -76,6 +82,11 @@ function move(step: number) {
           >
           <button type="button" class="close" aria-label="关闭搜索" @click="open = false">Esc</button>
         </div>
+        <button v-if="query.trim().length >= 2" type="button" class="ask" @click="askAi">
+          <span class="ask-mark" aria-hidden="true">✦</span>
+          <span class="ask-text">让 AI 根据手册回答：<b>{{ query.trim() }}</b></span>
+          <span class="ask-go">问手册 →</span>
+        </button>
         <ul v-if="results.length" ref="list" class="results">
           <li v-for="(hit, i) in results" :key="hit.id">
             <a
@@ -169,6 +180,52 @@ function move(step: number) {
   font-size: 11px;
   color: var(--c-text-3);
   cursor: pointer;
+}
+
+.ask {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 8px 0;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--ai-soft);
+  color: var(--c-text-1);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ask:hover,
+.ask:focus-visible {
+  border-color: var(--ai-via);
+}
+
+.ask-mark {
+  color: var(--ai-text);
+}
+
+.ask-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-2);
+}
+
+.ask-text b {
+  color: var(--c-text-1);
+}
+
+.ask-go {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ai-text);
 }
 
 .results {

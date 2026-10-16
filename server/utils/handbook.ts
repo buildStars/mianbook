@@ -3,10 +3,12 @@ import type { OutlinePart, OutlineQuestion, QuestionDetail } from '#shared/types
 
 let outlineCache: Promise<OutlinePart[]> | null = null
 
-/** 题目、分类有变动时调用，清掉目录缓存和搜索索引 */
+/** 题目、分类有变动时调用，清掉目录缓存和搜索索引，稍后同步问手册的检索索引 */
 export function invalidateContent() {
   outlineCache = null
   invalidateSearchIndex()
+  invalidateRetriever()
+  scheduleRagSync()
 }
 
 async function loadOutline(): Promise<OutlinePart[]> {

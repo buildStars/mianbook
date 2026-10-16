@@ -1,6 +1,7 @@
 import { and, count, eq, gte, ne, notLike } from 'drizzle-orm'
 import { createError, getHeader, type H3Event } from 'h3'
 import { AI_HEADERS, AI_PROVIDERS } from '#shared/utils/ai-providers'
+import type { AiKind } from '#shared/types/admin'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -251,7 +252,7 @@ export async function resolveAi(event: H3Event, userId: number) {
 }
 
 /** 记一次大模型调用；用自己 Key 的记成 xxx-own，不占站点的每日次数 */
-export function recordAiCall(userId: number, kind: 'interview' | 'report' | 'resume' | 'author', ownKey: boolean, usage?: ChatUsage) {
+export function recordAiCall(userId: number, kind: AiKind, ownKey: boolean, usage?: ChatUsage) {
   return useDb()
     .insert(tables.aiCalls)
     .values({

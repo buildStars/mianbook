@@ -111,6 +111,10 @@ export default async function setup(project: TestProject) {
       NUXT_AI_DAILY_LIMIT: String(DAILY_LIMIT),
       NUXT_AI_EXTRA_HOSTS: '',
       NUXT_CONTENT_DIR: contentDir,
+      NUXT_EMBED_BASE_URL: llm.url,
+      NUXT_EMBED_API_KEY: MOCK_KEY,
+      NUXT_EMBED_MODEL: 'mock-embed',
+      NUXT_EMBED_BATCH_SIZE: '32',
       NUXT_MAIL_OUTBOX_DIR: outboxDir,
       NUXT_MAIL_FROM: '测试 <noreply@example.test>',
       // 测试请求都来自本机：用 X-Forwarded-For 给每次注册分配不同的 IP，按 IP 限流的逻辑也能测

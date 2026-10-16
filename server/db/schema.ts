@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   datetime,
   double,
   index,
@@ -287,4 +288,28 @@ export const questionVersions = mysqlTable(
     createdAt: createdAt(),
   },
   (t) => [index('question_versions_question_idx').on(t.questionId, t.createdAt)],
+)
+
+/** 向量用二进制存 Float32 数组：1024 维 4KB，比 JSON 小一半多，读出来也不用解析 */
+const vectorBlob = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'blob' })
+
+/** 问手册（RAG）的检索索引：每道已发布的题按小节切成几块，块的向量由服务启动和题目变动时自动生成 */
+export const questionChunks = mysqlTable(
+  'question_chunks',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    questionId: int('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    ord: int('ord').notNull(),
+    heading: varchar('heading', { length: 255 }).notNull(),
+    text: text('text').notNull(),
+    /** 送去生成向量的文本（题目 + 小节 + 正文）的 SHA-256；内容没变时复用旧向量，不重复花钱 */
+    hash: varchar('hash', { length: 64 }).notNull(),
+    embedding: vectorBlob('embedding'),
+    /** 生成向量用的模型；换了模型要重新生成 */
+    embedModel: varchar('embed_model', { length: 128 }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('question_chunks_question_ord_unique').on(t.questionId, t.ord)],
 )

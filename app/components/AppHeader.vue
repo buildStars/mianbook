@@ -75,6 +75,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           复习<span v-if="dueToday" class="nav-badge" :aria-label="`今天待复习 ${dueToday} 道`">{{ dueToday > 99 ? '99+' : dueToday }}</span>
         </NuxtLink>
         <NuxtLink to="/mock" :class="{ active: route.path.startsWith('/mock') }">模拟面试</NuxtLink>
+        <NuxtLink to="/ask" :class="{ active: route.path === '/ask' }">问手册</NuxtLink>
       </nav>
 
       <div class="right">
@@ -127,6 +128,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <ElDropdownItem @click="navigateTo('/progress')">我的进度</ElDropdownItem>
               <ElDropdownItem @click="navigateTo('/review')">今日复习{{ dueToday ? `（${dueToday}）` : '' }}</ElDropdownItem>
               <ElDropdownItem @click="navigateTo('/mock')">模拟面试</ElDropdownItem>
+              <ElDropdownItem @click="navigateTo('/ask')">问手册</ElDropdownItem>
               <ElDropdownItem @click="navigateTo('/report')">学习周报</ElDropdownItem>
               <ElDropdownItem v-if="user?.role === 'admin'" @click="navigateTo('/admin')">管理后台</ElDropdownItem>
               <ElDropdownItem divided @click="logout">退出登录</ElDropdownItem>

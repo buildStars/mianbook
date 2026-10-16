@@ -38,6 +38,9 @@ NUXT_MAIL_PORT=465
 NUXT_MAIL_USER=
 NUXT_MAIL_PASS=
 NUXT_MAIL_FROM=
+
+# 问手册的向量模型（硅基流动 BAAI/bge-m3），不填时只用关键词检索
+NUXT_EMBED_API_KEY=
 EOF
   echo "已生成 /opt/handbook/.env"
 fi

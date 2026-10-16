@@ -65,6 +65,15 @@ export default defineNuxtConfig({
       // 用户自带 Key 时，除预设服务商外额外允许的域名，逗号分隔，如 api.example.com
       extraHosts: '',
     },
+    // 问手册（RAG）的向量模型：OpenAI 兼容的 /embeddings 接口，默认硅基流动的 bge-m3（中英文都好）。
+    // 不填 Key 时只用关键词检索，问手册照样能用
+    embed: {
+      baseUrl: 'https://api.siliconflow.cn/v1',
+      apiKey: '',
+      model: 'BAAI/bge-m3',
+      // 每次请求送几段文本
+      batchSize: 16,
+    },
     // 发信（注册验证码）：SMTP 配置，例如 QQ 邮箱 smtp.qq.com、465 端口、授权码。
     // 云服务器一般封了 25 端口，要用 465（SSL）或 587。outboxDir 设置后不真正发信，而是把邮件写成文件，用于本地开发和测试
     mail: {
