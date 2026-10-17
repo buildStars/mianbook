@@ -81,7 +81,7 @@ tags: [原理, 对比]
 :::
 
 ::: details Elicitation 能用来让用户输入密码或 API Key 吗？
-表单模式不能。规范禁止通过表单模式索取密码、API Key、访问令牌、支付凭证等敏感信息，这类场景必须用 URL 模式：Client 展示完整的链接，经用户同意后在浏览器中打开，用户直接在 Server 方的页面上输入，数据不经过 Client，也不会进入模型的上下文。
+表单模式不能。规范禁止通过表单模式索取密码、API Key、访问令牌、支付凭证等敏感信息，这类场景必须用 URL 模式：Client 展示完整的链接，经用户同意后在浏览器中打开，用户直接在 Server 方的页面上输入，数据不经过 Client，也不会进入模型的上下文。完整的用法见 [MCP 的 Elicitation](/ai/tools/18-mcp-elicitation)。
 :::
 
 ::: details 所有客户端都支持这几类能力吗？

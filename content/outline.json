@@ -37,7 +37,8 @@
       { "slug": "prompt", "title": "Prompt 与上下文工程" },
       { "slug": "tools", "title": "Tool Calling 与 MCP" },
       { "slug": "rag", "title": "RAG" },
-      { "slug": "agent", "title": "Agent" }
+      { "slug": "agent", "title": "Agent" },
+      { "slug": "frameworks", "title": "Agent 框架" }
     ]
   },
   {
@@ -45,7 +46,9 @@
     "title": "AI 工程化",
     "categories": [
       { "slug": "streaming", "title": "流式输出" },
+      { "slug": "harness", "title": "Agent 工程化" },
       { "slug": "eval", "title": "评测与可观测" },
+      { "slug": "cicd", "title": "测试与 CI/CD" },
       { "slug": "deploy", "title": "部署与成本" },
       { "slug": "security", "title": "安全" },
       { "slug": "system-design", "title": "系统设计" }
