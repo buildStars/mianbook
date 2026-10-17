@@ -167,11 +167,15 @@ templates/           新题目的 Markdown 模板和写作规范（writing-guide
 
 代码在 `server/utils/mcp-protocol.ts`（JSON-RPC 分发和协议版本协商，纯函数）、`server/utils/mcp-tools.ts`（7 个工具和 3 个提示词）、`server/routes/mcp.ts`（传输层）和 `server/utils/api-token.ts`（访问令牌）。
 
-1. **协议**：按 MCP 规范手写服务端，没有引入运行时依赖。消息是 JSON-RPC 2.0；`initialize` 时协商协议版本（支持 2024-11-05 到 2025-11-25），声明 tools 和 prompts 两种能力。协议错误（方法或工具不存在）用 JSON-RPC error，工具执行出错（参数不对、题目不存在、分类写错）用 `isError` 结果返回，模型能看到原因并自己修正
-2. **传输**：Streamable HTTP 的无状态模式：每个 POST 直接返回 JSON，通知回 202；不建会话、不推送，所以 GET 和 DELETE 回 405（浏览器打开时跳到接入说明页）。校验 `Origin` 防 DNS 重绑定，校验 `MCP-Protocol-Version` 请求头。无状态的好处是不用在实例之间共享会话，可以随便扩容
+1. **协议**：按 MCP 规范手写服务端，没有引入运行时依赖。消息是 JSON-RPC 2.0，声明 tools 和 prompts 两种能力，同时服务两代协议：
+   - **2026-07-28 版**：无状态，没有握手。每个请求在 `_meta` 里带协议版本和客户端能力，服务端逐个请求判断；结果都带 `resultType` 并在 `_meta` 里自报身份；`server/discover` 介绍支持的版本、能力和使用说明；列表结果带缓存提示，工具列表因令牌权限不同标成 `private`。版本不支持时返回 `-32022` 并列出支持的版本，客户端挑一个重试
+   - **2024-11-05 到 2025-11-25**：照常先 `initialize` 协商版本。请求里没有 `_meta` 版本的就按旧协议处理，旧客户端不用改
+   
+   协议错误（方法或工具不存在）用 JSON-RPC error，工具执行出错（参数不对、题目不存在、分类写错）用 `isError` 结果返回，模型能看到原因并自己修正
+2. **传输**：Streamable HTTP，不建会话：每个 POST 直接返回 JSON，通知回 202；GET 和 DELETE 回 405（浏览器打开时跳到接入说明页）。校验 `Origin` 防 DNS 重绑定。2026-07-28 版还要求把协议版本、方法和名称抄到请求头里（`MCP-Protocol-Version`、`Mcp-Method`、`Mcp-Name`），方便网关按头路由，服务端校验它们和正文一致，不一致回 400 + `-32020`；未知方法回 404。工具和提示词列表不会变，`subscriptions/listen` 确认订阅后立刻正常结束，客户端不会当成断线去重连。无状态的好处是不用在实例之间共享会话，可以随便扩容
 3. **鉴权**：个人访问令牌（`mbk_` 加 240 位随机数），数据库只存 SHA-256；分只读和可写入两种权限，只读令牌在 `tools/list` 里就看不到写入的工具；可以设有效期，撤销后立刻失效；每个令牌每分钟 60 次请求。规范推荐远程服务用 OAuth 2.1，个人项目先用令牌，Claude Code 和 Cursor 都支持自定义请求头
 4. **工具**：复用 Agent 面试官和问手册的实现：混合检索、找题、看题（带自己的笔记和下次复习时间）、按薄弱点抽题、学习情况、今日复习、记录得分（写进 FSRS 复习计划）。每个工具带 `readOnlyHint` 等注解，客户端据此决定调用前要不要征求用户同意。提示词 `quiz`、`review_today`、`explain` 在 Claude Code 里是 `/mcp__mianbook__quiz` 这样的命令
-5. **测试**：接口测试用官方 TypeScript SDK 的客户端（`@modelcontextprotocol/sdk`，只是开发依赖）连接真实服务，和 Claude Code 用的是同一套协议实现
+5. **测试**：接口测试用两代官方 TypeScript SDK 的客户端连接真实服务（都只是开发依赖）：v1（`@modelcontextprotocol/sdk`）走 `initialize` 握手；v2（`@modelcontextprotocol/client`）分别用锁定 2026-07-28 和自动协商两种方式连接，确认协商出的是新协议。请求头校验、版本错误、订阅流这些边界情况用原始 HTTP 请求测
 
 ## 选题雷达
 

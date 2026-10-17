@@ -1,3 +1,8 @@
+import {
+  Client as ModernMcpClient,
+  StreamableHTTPClientTransport as ModernTransport,
+  type VersionNegotiationMode,
+} from '@modelcontextprotocol/client'
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -20,6 +25,17 @@ async function connect(token: string) {
   return client
 }
 
+/** v2 SDK 的客户端，实现的是 2026-07-28 版协议；pin 表示只用新协议、不回退到 initialize */
+async function connectModern(token: string, mode: VersionNegotiationMode = { pin: '2026-07-28' }) {
+  const client = new ModernMcpClient({ name: 'handbook-test', version: '1.0.0' }, { versionNegotiation: { mode } })
+  await client.connect(
+    new ModernTransport(new URL(`${baseUrl()}/mcp`), {
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    }),
+  )
+  return client
+}
+
 const text = (result: any) => (result.content as { type: string; text: string }[]).map((c) => c.text).join('\n')
 
 /** 直接发 HTTP 请求，测传输层的边界情况 */
@@ -29,6 +45,18 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
     headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   })
+
+/** 2026-07-28 起每个请求都在 _meta 里带版本和客户端能力，并把方法、名称抄到请求头里 */
+const MODERN_META = {
+  'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+  'io.modelcontextprotocol/clientCapabilities': {},
+  'io.modelcontextprotocol/clientInfo': { name: 'handbook-test', version: '1.0.0' },
+}
+const modernPost = (method: string, params: Record<string, unknown>, headers: Record<string, string>) =>
+  post(
+    { jsonrpc: '2.0', id: 1, method, params: { ...params, _meta: MODERN_META } },
+    { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': method, ...(params.name ? { 'Mcp-Name': String(params.name) } : {}), ...headers },
+  )
 
 describe('访问令牌', () => {
   it('创建时返回一次明文，列表里只有前缀；只能撤销自己的', async () => {
@@ -102,6 +130,75 @@ describe('MCP Server', () => {
     const quiz = await client.getPrompt({ name: 'quiz', arguments: { topic: 'Redis', count: '2' } })
     expect((quiz.messages[0]!.content as any).text).toContain('「Redis」方向的题，一共 2 道')
     await client.close()
+  })
+
+  it('2026-07-28 版的官方客户端（v2 SDK）：无状态协议下工具和提示词都能用', async () => {
+    const client = await connectModern(writeToken)
+    expect(client.getProtocolEra()).toBe('modern')
+    expect(client.getServerVersion()).toMatchObject({ name: 'mianbook', version: '1.0.0' })
+    expect(client.getInstructions()).toContain('search_handbook')
+
+    const { tools } = await client.listTools()
+    expect(tools.map((t) => t.name)).toContain('record_result')
+    const found = text(await client.callTool({ name: 'search_handbook', arguments: { query: '缓存穿透 布隆过滤器', limit: 3 } }))
+    expect(found).toMatch(/找到 \d+ 段相关内容/)
+
+    const { prompts } = await client.listPrompts()
+    expect(prompts.map((p) => p.name)).toEqual(['quiz', 'review_today', 'explain'])
+    const quiz = await client.getPrompt({ name: 'quiz', arguments: { topic: 'Redis', count: '2' } })
+    expect((quiz.messages[0]!.content as any).text).toContain('「Redis」方向的题，一共 2 道')
+    await client.close()
+  })
+
+  it('自动协商的 v2 客户端选 2026-07-28；v1 客户端照样走 initialize 握手', async () => {
+    const auto = await connectModern(readToken, 'auto')
+    expect(auto.getProtocolEra()).toBe('modern')
+    expect(auto.getDiscoverResult()?.supportedVersions).toEqual(expect.arrayContaining(['2026-07-28', '2025-11-25']))
+    await auto.close()
+
+    const legacy = await connect(readToken)
+    expect(legacy.getServerVersion()).toMatchObject({ name: 'mianbook' })
+    expect((await legacy.listTools()).tools.map((t) => t.name)).not.toContain('record_result')
+    await legacy.close()
+  })
+
+  it('2026-07-28 的传输层：请求头要和正文一致，不支持的版本列出可用版本，未知方法回 404，订阅流正常结束', async () => {
+    const auth = { Authorization: `Bearer ${readToken}` }
+    const listed = await modernPost('tools/list', {}, auth)
+    expect(listed.status).toBe(200)
+    const tools = (await listed.json()).result
+    expect(tools).toMatchObject({ resultType: 'complete', cacheScope: 'private' })
+    expect(tools.tools.map((t: any) => t.name)).not.toContain('record_result')
+
+    // 请求头里的名称和正文不一致、或者缺了 Mcp-Method：400 + -32020
+    const wrongName = await modernPost('tools/call', { name: 'search_handbook', arguments: { query: 'Redis' } }, { ...auth, 'Mcp-Name': 'get_question' })
+    expect(wrongName.status).toBe(400)
+    expect((await wrongName.json()).error.code).toBe(-32020)
+    const noMethod = await post({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: MODERN_META } }, { ...auth, 'MCP-Protocol-Version': '2026-07-28' })
+    expect(noMethod.status).toBe(400)
+    expect((await noMethod.json()).error.code).toBe(-32020)
+
+    // 不支持的版本：400 + -32022，列出支持的版本
+    const futureMeta = { ...MODERN_META, 'io.modelcontextprotocol/protocolVersion': '2099-01-01' }
+    const future = await post({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: futureMeta } }, { ...auth, 'MCP-Protocol-Version': '2099-01-01', 'Mcp-Method': 'tools/list' })
+    expect(future.status).toBe(400)
+    expect((await future.json()).error).toMatchObject({ code: -32022, data: { supported: expect.arrayContaining(['2026-07-28', '2025-11-25']) } })
+
+    // 新协议里没有 ping：404 + -32601
+    const ping = await modernPost('ping', {}, auth)
+    expect(ping.status).toBe(404)
+    expect((await ping.json()).error.code).toBe(-32601)
+
+    // subscriptions/listen：SSE 里先确认订阅，再给出正常结束的结果
+    const listen = await modernPost('subscriptions/listen', { notifications: { toolsListChanged: true } }, auth)
+    expect(listen.status).toBe(200)
+    expect(listen.headers.get('content-type')).toContain('text/event-stream')
+    const events = (await listen.text())
+      .split('\n\n')
+      .filter(Boolean)
+      .map((block) => JSON.parse(block.split('\n').find((line) => line.startsWith('data: '))!.slice('data: '.length)))
+    expect(events.map((e) => e.method ?? 'result')).toEqual(['notifications/subscriptions/acknowledged', 'result'])
+    expect(events[1]).toMatchObject({ id: 1, result: { resultType: 'complete' } })
   })
 
   it('检索手册、找题、看题：返回题目链接和用户自己的学习记录', async () => {
