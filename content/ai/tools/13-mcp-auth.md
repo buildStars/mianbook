@@ -46,9 +46,9 @@ Client ──Authorization: Bearer <token> ──▶ MCP Server
 
 MCP 的特点是 Client 和 Server 往往事先互不认识，所以规范给了三种注册方式。三种都支持的 Client 建议按这个顺序选：有预注册信息先用预注册；授权服务器元数据声明支持（`client_id_metadata_document_supported`）就用 Client ID Metadata Documents；再退到动态注册；都不行才让用户手动填写：
 
-- **Client ID Metadata Documents**：Client 用一个 HTTPS URL 当 `client_id`，授权服务器去这个 URL 拉取客户端的元数据（名称、回调地址）。规范要求 Client 和授权服务器“应当”（SHOULD）支持，面向双方事先没有关系这种最常见的情况
+- **Client ID Metadata Documents**：Client 用一个 HTTPS URL 当 `client_id`，授权服务器去这个 URL 拉取客户端的元数据（名称、回调地址）。规范要求 Client 和授权服务器"应当"（SHOULD）支持，面向双方事先没有关系这种最常见的情况
 - **预注册**：管理员事先在授权服务器上登记好，适合企业内部固定的客户端
-- **动态客户端注册（RFC 7591）**：Client 调注册接口现场申请。规范里是“可以”（MAY）支持，保留主要是为了兼容早期版本的规范
+- **动态客户端注册（RFC 7591）**：Client 调注册接口现场申请。规范里是"可以"（MAY）支持，保留主要是为了兼容早期版本的规范
 
 ### Server 端最重要的两条
 
