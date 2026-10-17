@@ -298,5 +298,35 @@
     "q": "nuxt 服务端渲染时调接口没带上用户 cookie，拿到的全是未登录数据咋整",
     "expect": ["basics/ssr/10-ssr-auth", "basics/ssr/07-nuxt-data-fetching"],
     "type": "colloquial"
+  },
+  {
+    "q": "用 LangGraph 做的报销审批流程，想让它停在付款前等主管点确认后再继续，怎么实现",
+    "expect": ["ai/frameworks/07-langgraph-interrupt"],
+    "type": "scenario"
+  },
+  {
+    "q": "LangGraph 里两个并行节点同时更新同一个状态字段就报错，怎么让它们的结果合并起来",
+    "expect": ["ai/frameworks/05-langgraph-state"],
+    "type": "followup"
+  },
+  {
+    "q": "想让 Agent 每次改完文件都自动跑一遍格式化，不用每次在提示词里提醒它，有啥办法",
+    "expect": ["engineering/harness/03-hooks"],
+    "type": "colloquial"
+  },
+  {
+    "q": "让 Agent 去翻几十个文件找线索时，怎么避免这些中间内容把主对话的上下文撑爆",
+    "expect": ["engineering/harness/04-subagents", "ai/agent/12-long-task-context"],
+    "type": "paraphrase"
+  },
+  {
+    "q": "E2E 测试本地跑都能过，一到 CI 上就时不时挂，重跑一下又好了，咋整",
+    "expect": ["engineering/cicd/04-e2e-stability"],
+    "type": "colloquial"
+  },
+  {
+    "q": "单元测试里直接调了真的大模型接口，又慢又花钱结果还不稳定，测试该怎么写",
+    "expect": ["engineering/cicd/05-llm-app-testing"],
+    "type": "scenario"
   }
 ]
