@@ -5,6 +5,8 @@ interface AiStatus {
   enabled: boolean
   model: string
   remaining: number
+  /** 管理员关闭了这个用户使用站点 AI 的权限 */
+  blocked?: boolean
   extraHosts: string[]
   allowUserKey: boolean
 }
@@ -201,7 +203,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
         </div>
         <div class="head-side">
           <span v-if="hasKey" class="quota own">自己的 Key · {{ aiKey?.model }}</span>
-          <span v-else-if="ai?.enabled" class="quota">AI 今日剩余 {{ ai.remaining }} 次</span>
+          <span v-else-if="ai?.enabled" class="quota">{{ ai.blocked ? '站点 AI 已关闭' : `AI 今日剩余 ${ai.remaining} 次` }}</span>
           <button v-if="!finished" type="button" class="btn btn-sm btn-ghost" :disabled="busy || streaming" @click="finish">结束面试</button>
         </div>
       </header>

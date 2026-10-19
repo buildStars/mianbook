@@ -109,23 +109,35 @@ export function parseUserTarget(
   return { source: 'user', baseUrl: `${url.origin}${url.pathname}`.replace(/\/+$/, ''), apiKey, model }
 }
 
-/** 最近 24 小时内用站点 Key 的调用次数（滚动窗口，不受时区影响）；用户自己的 Key 记为 xxx-own，管理员在后台写题记为 author，都不计入 */
+/** 计入次数的调用：用户自己的 Key 记为 xxx-own，管理员在后台写题记为 author，都不计入；出错的调用不扣次数 */
+export const countedAiCalls = (since: Date) =>
+  and(
+    notLike(tables.aiCalls.kind, '%-own'),
+    ne(tables.aiCalls.kind, 'author'),
+    ne(tables.aiCalls.status, 'error'),
+    gte(tables.aiCalls.createdAt, since),
+  )
+
+/** 次数按最近 24 小时滚动计算，不受时区影响 */
+export const aiWindowStart = () => new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+/** 最近 24 小时内用站点 Key 的调用次数 */
 export async function aiUsageToday(userId: number): Promise<number> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const [row] = await useDb()
     .select({ total: count() })
     .from(tables.aiCalls)
-    .where(
-      and(
-        eq(tables.aiCalls.userId, userId),
-        notLike(tables.aiCalls.kind, '%-own'),
-        ne(tables.aiCalls.kind, 'author'),
-        // 出错的调用不扣次数
-        ne(tables.aiCalls.status, 'error'),
-        gte(tables.aiCalls.createdAt, since),
-      ),
-    )
+    .where(and(eq(tables.aiCalls.userId, userId), countedAiCalls(aiWindowStart())))
   return row?.total ?? 0
+}
+
+/** 这个用户 24 小时内能用站点 Key 调用几次：管理员单独设过的按单独设的算，否则跟随全站设置 */
+export async function userDailyLimit(userId: number): Promise<{ limit: number; custom: boolean }> {
+  const [row] = await useDb()
+    .select({ limit: tables.users.aiDailyLimit })
+    .from(tables.users)
+    .where(eq(tables.users.id, userId))
+  const custom = row?.limit ?? null
+  return custom === null ? { limit: aiConfig().dailyLimit, custom: false } : { limit: custom, custom: true }
 }
 
 export class AiError extends Error {
@@ -305,24 +317,30 @@ export async function pingModel(target: AiTarget): Promise<void> {
   if (!res.ok) throw await toAiError(res, target)
 }
 
-/** 确定这次调用用谁的 Key：请求头里带了用户自己的 Key 就用它（不限次数），否则用站点的 Key 并检查每日次数 */
+/** 确定这次调用用谁的 Key：请求头里带了用户自己的 Key 就用它（不限次数），否则用站点的 Key 并检查次数 */
 export async function resolveAi(event: H3Event, userId: number) {
-  const { dailyLimit } = aiConfig()
   const target = userTarget(event) ?? siteTarget()
-  const ownKey = target.source === 'user'
-  if (!ownKey && !target.apiKey) {
+  /** 这次调用之后还剩几次；用自己的 Key 时为 null */
+  if (target.source === 'user') return { target, ownKey: true, remaining: null }
+  if (!target.apiKey) {
     throw createError({ statusCode: 503, message: '站点没有配置 AI 服务，请在 AI 设置里填写你自己的 API Key' })
   }
-  const used = ownKey ? 0 : await aiUsageToday(userId)
-  if (!ownKey && used >= dailyLimit) {
+  const [{ limit, custom }, used] = await Promise.all([userDailyLimit(userId), aiUsageToday(userId)])
+  // 后台关了"用户自带 Key"时，不提示去填自己的 Key
+  const userKeyAllowed = aiConfig().allowUserKey
+  if (custom && limit === 0) {
     throw createError({
-      statusCode: 429,
-      message: `24 小时内的 AI 次数已用完（${dailyLimit} 次），可以稍后再来，或在 AI 设置里填写自己的 API Key`,
+      statusCode: 403,
+      message: userKeyAllowed ? '管理员关闭了你使用站点 AI 的权限，可以在 AI 设置里填写自己的 API Key' : '管理员关闭了你使用站点 AI 的权限',
     })
   }
-  /** 这次调用之后还剩几次；用自己的 Key 时为 null */
-  const remaining = ownKey ? null : Math.max(0, dailyLimit - used - 1)
-  return { target, ownKey, remaining }
+  if (used >= limit) {
+    throw createError({
+      statusCode: 429,
+      message: `24 小时内的 AI 次数已用完（${limit} 次），${userKeyAllowed ? '可以稍后再来，或在 AI 设置里填写自己的 API Key' : '请稍后再来'}`,
+    })
+  }
+  return { target, ownKey: false, remaining: Math.max(0, limit - used - 1) }
 }
 
 export interface AiCallOutcome {

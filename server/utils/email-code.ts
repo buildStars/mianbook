@@ -34,7 +34,13 @@ const tooMany = (message: string, retryAfter: number) =>
  * 生成并发送验证码。按邮箱、IP 和全站总量限制频率，防止被拿来刷邮件或批量注册。
  * 返回多少秒后可以再次发送
  */
-export async function issueEmailCode(event: H3Event, email: string, purpose: CodePurpose) {
+export async function issueEmailCode(
+  event: H3Event,
+  email: string,
+  purpose: CodePurpose,
+  /** byAdmin：管理员在后台替用户发起的重置，邮件里换成对应的说明 */
+  options: { byAdmin?: boolean } = {},
+) {
   const { auth } = useRuntimeConfig()
   const db = useDb()
   const t = tables.emailCodes
@@ -66,7 +72,7 @@ export async function issueEmailCode(event: H3Event, email: string, purpose: Cod
     .$returningId()
 
   try {
-    await sendMail(codeMail(email, code, purpose))
+    await sendMail(codeMail(email, code, purpose, options.byAdmin))
   } catch (error) {
     // 没发出去的验证码不占发送次数
     await db.delete(t).where(eq(t.id, created!.id))
@@ -109,23 +115,27 @@ export async function consumeEmailCode(email: string, purpose: CodePurpose, code
   if (!result.affectedRows) throw createError({ statusCode: 400, message: '验证码已使用，请重新获取' })
 }
 
-function codeMail(to: string, code: string, purpose: CodePurpose): MailMessage {
+function codeMail(to: string, code: string, purpose: CodePurpose, byAdmin = false): MailMessage {
   const site = String(useRuntimeConfig().public.siteName || '全栈面试手册')
-  const action = purpose === 'reset' ? `重置${site}的密码` : `注册${site}`
   const label = purpose === 'reset' ? '重置密码验证码' : '注册验证码'
+  const intro = byAdmin
+    ? `管理员为你在${site}的账号发起了重置密码，验证码是：`
+    : `你正在${purpose === 'reset' ? `重置${site}的密码` : `注册${site}`}，验证码是：`
+  const notes = byAdmin
+    ? [
+        `请打开${site}的登录页，点"忘记密码"，输入这个邮箱和验证码，再设置新密码。${CODE_TTL_MINUTES} 分钟内有效，只能使用一次。`,
+        '如果你没有找过管理员，忽略这封邮件即可，原来的密码仍然可以使用。',
+      ]
+    : [`${CODE_TTL_MINUTES} 分钟内有效，只能使用一次。`, '如果这不是你本人的操作，请忽略这封邮件，不要把验证码告诉别人。']
   return {
     to,
     subject: `${code} 是你的${label} · ${site}`,
-    text: [
-      `你正在${action}，验证码是：${code}`,
-      `${CODE_TTL_MINUTES} 分钟内有效，只能使用一次。`,
-      '如果这不是你本人的操作，请忽略这封邮件，不要把验证码告诉别人。',
-    ].join('\n\n'),
+    text: [`${intro}${code}`, ...notes].join('\n\n'),
     html: `<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1c1b19;background:#faf9f6">
   <div style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:8px;background:#c8372d;color:#fff;font-weight:700;font-size:20px">面</div>
-  <p style="margin:24px 0 8px;font-size:15px">你正在${action}，验证码是：</p>
+  <p style="margin:24px 0 8px;font-size:15px">${intro}</p>
   <p style="margin:0 0 20px;font-size:34px;font-weight:700;letter-spacing:8px;color:#1f3fd6">${code}</p>
-  <p style="margin:0;font-size:13px;color:#56524c;line-height:1.8">${CODE_TTL_MINUTES} 分钟内有效，只能使用一次。<br>如果这不是你本人的操作，请忽略这封邮件，不要把验证码告诉别人。</p>
+  <p style="margin:0;font-size:13px;color:#56524c;line-height:1.8">${notes.join('<br>')}</p>
 </div>`,
   }
 }

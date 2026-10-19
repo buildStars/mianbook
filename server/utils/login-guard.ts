@@ -1,4 +1,4 @@
-import { and, count, eq, gte, lt, min } from 'drizzle-orm'
+import { and, count, eq, gte, lt, max, min } from 'drizzle-orm'
 
 /**
  * 登录防暴力破解：按三个维度统计最近的失败次数，超过就暂时拒绝登录（被拒绝的请求不再计数，锁定不会越锁越久）。
@@ -51,6 +51,38 @@ export async function recordLoginFailure(email: string, ip: string | null) {
     db.delete(tables.failedLogins)
       .where(lt(tables.failedLogins.createdAt, new Date(Date.now() - 24 * 60 * MINUTE)))
       .catch(() => {})
+  }
+}
+
+const ruleOf = (scope: (typeof RULES)[number]['scope']) => RULES.find((r) => r.scope === scope)!
+
+/**
+ * 后台查看一个账号的锁定情况：最近一小时失败了几次、整个账号有没有被锁、有几个 IP 对这个账号被锁。
+ * 只按 IP 统计的那条规则和具体账号无关，不在这里显示
+ */
+export async function loginFailureStatus(email: string) {
+  const db = useDb()
+  const t = tables.failedLogins
+  const now = Date.now()
+  const account = ruleOf('account')
+  const accountIp = ruleOf('account-ip')
+  const [[total], perIp] = await Promise.all([
+    db
+      .select({ n: count(), last: max(t.createdAt) })
+      .from(t)
+      .where(and(eq(t.email, email), gte(t.createdAt, new Date(now - account.windowMs)))),
+    db
+      .select({ n: count() })
+      .from(t)
+      .where(and(eq(t.email, email), gte(t.createdAt, new Date(now - accountIp.windowMs))))
+      .groupBy(t.ip),
+  ])
+  const failures = total?.n ?? 0
+  return {
+    failures,
+    lastFailureAt: total?.last ? new Date(total.last).toISOString() : null,
+    accountLocked: failures >= account.limit,
+    lockedIps: perIp.filter((r) => r.n >= accountIp.limit).length,
   }
 }
 

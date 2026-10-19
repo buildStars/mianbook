@@ -39,6 +39,10 @@ export const users = mysqlTable(
     emailVerifiedAt: datetime('email_verified_at', { mode: 'date' }),
     /** 会话版本：改密码时加 1，旧会话里的版本对不上就失效（让其他设备下线） */
     sessionVersion: int('session_version').notNull().default(0),
+    /** 管理员单独设的站点 AI 次数上限（24 小时）：为空跟随全站设置，0 表示不能用站点的 AI */
+    aiDailyLimit: int('ai_daily_limit'),
+    /** 停用的时间：停用后不能登录，已登录的设备下线，访问令牌也不能用；为空表示正常 */
+    disabledAt: datetime('disabled_at', { mode: 'date' }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('users_email_unique').on(t.email)],

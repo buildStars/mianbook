@@ -8,6 +8,8 @@ interface AiStatus {
   model: string
   dailyLimit: number
   remaining: number
+  /** 管理员关闭了这个用户使用站点 AI 的权限 */
+  blocked?: boolean
   extraHosts: string[]
   allowUserKey: boolean
 }
@@ -190,7 +192,7 @@ const formatTime = (iso: string) =>
           <li v-for="n in MAX_ROUNDS" :key="n" :class="{ done: n <= turns.length, current: n === turns.length + 1 && !finished }" />
         </ol>
         <span v-if="loggedIn && hasKey" class="quota own" :title="`使用你自己的 API Key，模型：${aiKey?.model}`">自己的 Key · {{ aiKey?.model }}</span>
-        <span v-else-if="ai?.enabled && loggedIn" class="quota" :title="`模型：${ai.model}`">今日剩余 {{ ai.remaining }} 次</span>
+        <span v-else-if="ai?.enabled && loggedIn" class="quota" :title="`模型：${ai.model}`">{{ ai.blocked ? '站点 AI 已关闭' : `今日剩余 ${ai.remaining} 次` }}</span>
         <button
           v-if="loggedIn && allowOwnKey"
           type="button"
@@ -243,7 +245,7 @@ const formatTime = (iso: string) =>
             开始面试
           </button>
           <span v-if="outOfQuota" class="intro-tip">
-            今天的次数用完了<template v-if="allowOwnKey">，可以<button type="button" class="link-btn" @click="showSettings = true">填写自己的 API Key</button>继续</template><template v-else>，明天再来</template>
+            {{ ai?.blocked ? '管理员关闭了你使用站点 AI 的权限' : '今天的次数用完了' }}<template v-if="allowOwnKey">，可以<button type="button" class="link-btn" @click="showSettings = true">填写自己的 API Key</button>继续</template><template v-else-if="!ai?.blocked">，明天再来</template>
           </span>
           <span v-else class="intro-tip">建议先打开"自测模式"，不看答案直接作答</span>
         </div>

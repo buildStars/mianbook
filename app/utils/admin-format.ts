@@ -33,3 +33,12 @@ export function formatSeconds(seconds: number): string {
   if (m < 60) return `${Math.round(m)} 分钟`
   return `${(m / 60).toFixed(m < 600 ? 1 : 0)} 小时`
 }
+
+/** 耗时：850ms、2.3s；没有数据时显示 — */
+export const formatMs = (v: number | null) => (v === null ? '—' : v < 1000 ? `${v}ms` : `${(v / 1000).toFixed(1)}s`)
+
+/** 金额：¥12.30、$0.05；不到一分钱时不显示成 0 */
+export function formatMoney(c: { amount: number; currency: 'CNY' | 'USD' }): string {
+  const symbol = c.currency === 'CNY' ? '¥' : '$'
+  return c.amount > 0 && c.amount < 0.01 ? `不到 ${symbol}0.01` : `${symbol}${c.amount.toFixed(2)}`
+}

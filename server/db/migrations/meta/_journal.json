@@ -71,6 +71,13 @@
       "when": 1792167577543,
       "tag": "0009_observability",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1792434005705,
+      "tag": "0010_user_admin",
+      "breakpoints": true
     }
   ]
 }

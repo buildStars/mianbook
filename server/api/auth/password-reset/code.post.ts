@@ -10,7 +10,11 @@ const schema = z.object({ email: z.string().trim().toLowerCase().max(191).email(
 export default defineEventHandler(async (event) => {
   const { email } = await readValidated(event, schema)
   if (!mailConfigured()) throw createError({ statusCode: 400, message: '站点还没有配置发信邮箱，暂时不能自助重置密码，请联系管理员' })
-  const [user] = await useDb().select({ id: tables.users.id }).from(tables.users).where(eq(tables.users.email, email))
-  if (!user) return { cooldown: Number(useRuntimeConfig().auth.codeCooldownSeconds) || 60, expiresInMinutes: 10 }
+  const [user] = await useDb()
+    .select({ id: tables.users.id, disabledAt: tables.users.disabledAt })
+    .from(tables.users)
+    .where(eq(tables.users.email, email))
+  // 已停用的账号也不发信（重置了也不能登录），返回的结果和没注册一样
+  if (!user || user.disabledAt) return { cooldown: Number(useRuntimeConfig().auth.codeCooldownSeconds) || 60, expiresInMinutes: 10 }
   return issueEmailCode(event, email, 'reset')
 })

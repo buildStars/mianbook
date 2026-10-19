@@ -8,6 +8,8 @@ interface AiStatus {
   enabled: boolean
   model: string
   remaining: number
+  /** 管理员关闭了这个用户使用站点 AI 的权限 */
+  blocked?: boolean
   extraHosts: string[]
   allowUserKey: boolean
 }
@@ -360,6 +362,7 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
             <template v-if="mode === 'agent'">预计约 <b>{{ estimate }}</b> 次 AI 次数（每回答一次算 1 次，追问另算）。</template>
             <template v-else>预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ perQuestion }} 次，加 1 次总结<template v-if="mode === 'resume'">和 1 次出题</template>）。</template>
             <template v-if="hasKey">使用你自己的 Key（{{ aiKey?.model }}），不限次数。</template>
+            <template v-else-if="ai?.enabled && ai.blocked">管理员关闭了你使用站点 AI 的权限<template v-if="allowOwnKey">，可以用自己的 API Key</template>。</template>
             <template v-else-if="ai?.enabled">今天还剩 {{ ai.remaining }} 次，不够时可以中途停下，下次接着答。</template>
             <template v-else>站点没有配置 AI 服务，需要填写你自己的 API Key。</template>
             <button v-if="allowOwnKey" type="button" class="link-btn" @click="showSettings = !showSettings">{{ hasKey ? 'AI 设置' : '用自己的 Key' }}</button>

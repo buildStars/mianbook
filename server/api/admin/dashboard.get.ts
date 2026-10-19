@@ -2,6 +2,7 @@ import { and, avg, count, countDistinct, desc, eq, gte, inArray, isNotNull, ne, 
 import type { AnyMySqlColumn } from 'drizzle-orm/mysql-core'
 import { z } from 'zod'
 import type { AdminDashboard, AiKind, DashboardQuestionRef } from '#shared/types/admin'
+import { AI_KINDS } from '#shared/utils/ai-kinds'
 
 const schema = z.object({
   /** 浏览器 getTimezoneOffset() 的值，东八区为 -480 */
@@ -10,7 +11,6 @@ const schema = z.object({
 
 const DAY = 86_400_000
 const BOARD_SIZE = 8
-const KINDS: AiKind[] = ['interview', 'agent', 'ask', 'report', 'resume', 'author']
 
 const round1 = (n: number | string | null | undefined) => (n == null ? null : Math.round(Number(n) * 10) / 10)
 
@@ -155,7 +155,7 @@ export default defineEventHandler(async (event): Promise<AdminDashboard> => {
   // AI 用量
   const { model, apiKey, pricing } = aiConfig()
   const daily = days.map((date) => ({ date, site: 0, own: 0, promptTokens: 0, completionTokens: 0 }))
-  const byKind = new Map(KINDS.map((kind) => [kind, { kind, site: 0, own: 0 }]))
+  const byKind = new Map(AI_KINDS.map((kind) => [kind, { kind, site: 0, own: 0 }]))
   let untracked = 0
   for (const r of aiRows) {
     const own = r.kind.endsWith('-own')
@@ -234,7 +234,7 @@ export default defineEventHandler(async (event): Promise<AdminDashboard> => {
 
   return {
     perf: {
-      ...aiPerformance(perfRows, KINDS),
+      ...aiPerformance(perfRows, AI_KINDS),
       recentErrors: aiErrors.map((r) => ({ kind: r.kind, model: r.model, error: r.error ?? '', at: r.at.toISOString() })),
     },
     errors: {

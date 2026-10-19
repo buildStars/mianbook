@@ -131,3 +131,62 @@ export interface AdminAiSettings {
   defaults: { model: string; dailyLimit: number; extraHosts: string[] }
   overridden: Record<string, unknown>
 }
+
+/** 后台用户列表的一行 */
+export interface AdminUserRow {
+  id: number
+  email: string
+  name: string
+  role: 'admin' | 'user'
+  createdAt: string
+  emailVerified: boolean
+  /** 停用的时间；正常的账号为 null */
+  disabledAt: string | null
+  mastered: number
+  interviews: number
+  /** 最近 30 天用站点 Key 的调用次数 */
+  aiCalls30d: number
+  /** 最近 24 小时计入次数的调用，和用户看到的"剩余次数"同一个口径 */
+  aiUsed24h: number
+  /** 生效的 24 小时上限：单独设过的按单独设的，否则是全站设置 */
+  aiLimit: number
+  /** 单独设的上限；null 表示跟随全站设置，0 表示不能用站点的 AI */
+  aiLimitCustom: number | null
+  lastActiveAt: string | null
+}
+
+/** 后台用户详情 */
+export interface AdminUserDetail {
+  user: AdminUserRow
+  /** 全站的 24 小时上限，表单里"跟随全站设置"显示用 */
+  defaultLimit: number
+  /** 站点配置了发信邮箱，才能发重置密码邮件 */
+  mailConfigured: boolean
+  study: { mastered: number; fuzzy: number; weak: number; starred: number; notes: number; cards: number; due: number }
+  practice: { interviews: number; mocks: number; mocksFinished: number; agents: number }
+  /** 最近 30 天的 AI 调用 */
+  ai: {
+    site: number
+    own: number
+    errors: number
+    byKind: { kind: AiKind; site: number; own: number; errors: number }[]
+    /** 只统计站点 Key 的 token */
+    promptTokens: number
+    completionTokens: number
+    /** 按后台设置的价格估算的站点 Key 费用；没设置价格时为 null */
+    cost: { amount: number; currency: 'CNY' | 'USD' } | null
+    recent: {
+      id: number
+      at: string
+      kind: string
+      model: string | null
+      status: 'ok' | 'aborted' | 'error'
+      latencyMs: number | null
+      tokens: number | null
+      error: string | null
+    }[]
+  }
+  /** 最近一小时的登录失败；被锁的 IP 只算"账号 + IP"这条规则 */
+  login: { failures: number; lastFailureAt: string | null; accountLocked: boolean; lockedIps: number }
+  tokens: { id: number; name: string; prefix: string; scope: 'read' | 'write'; createdAt: string; lastUsedAt: string | null; expiresAt: string | null }[]
+}

@@ -40,13 +40,7 @@ const aiTrend = computed(() => {
   return { pct, up: pct >= 0 }
 })
 
-const KIND_LABELS = { interview: 'AI 单题面试', agent: 'Agent 面试', ask: '问手册', report: '模拟面试总结', resume: '简历出题', author: '后台 AI 写题' } as const
 const kindMax = computed(() => Math.max(1, ...(data.value?.ai.byKind ?? []).map((k) => k.site + k.own)))
-
-const ms = (v: number | null) => (v === null ? '—' : v < 1000 ? `${v}ms` : `${(v / 1000).toFixed(1)}s`)
-const kindLabel = (kind: string) => KIND_LABELS[kind.replace(/-own$/, '') as keyof typeof KIND_LABELS] ?? kind
-
-const money = (c: { amount: number; currency: 'CNY' | 'USD' }) => `${c.currency === 'CNY' ? '¥' : '$'}${c.amount.toFixed(2)}`
 
 const mockRate = computed(() => {
   const l = data.value?.learning
@@ -97,7 +91,7 @@ const editLink = (id: number) => `/admin/questions/${id}`
         </div>
         <div class="a-card kpi">
           <p class="kpi-label"><AdminIcon name="coin" :size="15" />估算花费 · 14 天</p>
-          <p v-if="data.ai.cost" class="kpi-value a-num">{{ money(data.ai.cost) }}</p>
+          <p v-if="data.ai.cost" class="kpi-value a-num">{{ formatMoney(data.ai.cost) }}</p>
           <p v-else class="kpi-value a-num muted-value">—</p>
           <p class="kpi-sub">
             输入 {{ compactNumber(data.ai.promptTokens) }} · 输出 {{ compactNumber(data.ai.completionTokens) }} tokens
@@ -138,7 +132,7 @@ const editLink = (id: number) => `/admin/questions/${id}`
             <ul class="kinds">
               <li v-for="k in data.ai.byKind" :key="k.kind">
                 <div class="kind-line">
-                  <span>{{ KIND_LABELS[k.kind] }}</span>
+                  <span>{{ AI_KIND_LABELS[k.kind] }}</span>
                   <span class="a-num">{{ k.site + k.own }}</span>
                 </div>
                 <div class="kind-bar" aria-hidden="true">
@@ -174,18 +168,18 @@ const editLink = (id: number) => `/admin/questions/${id}`
                 </thead>
                 <tbody>
                   <tr v-for="r in [...data.perf.byKind, data.perf.overall]" :key="r.kind" :class="{ total: r.kind === 'all' }">
-                    <td>{{ r.kind === 'all' ? '全部' : KIND_LABELS[r.kind] }}</td>
+                    <td>{{ r.kind === 'all' ? '全部' : AI_KIND_LABELS[r.kind] }}</td>
                     <td class="n a-num">{{ r.calls }}</td>
                     <td class="n a-num" :class="{ bad: r.errorRate >= 0.05 }">{{ (r.errorRate * 100).toFixed(1) }}%</td>
-                    <td class="n a-mono">{{ ms(r.ttftP50) }} / {{ ms(r.ttftP95) }}</td>
-                    <td class="n a-mono">{{ ms(r.latencyP50) }} / {{ ms(r.latencyP95) }}</td>
+                    <td class="n a-mono">{{ formatMs(r.ttftP50) }} / {{ formatMs(r.ttftP95) }}</td>
+                    <td class="n a-mono">{{ formatMs(r.latencyP50) }} / {{ formatMs(r.latencyP95) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <ul v-if="data.perf.recentErrors.length" class="err-list">
               <li v-for="(e, i) in data.perf.recentErrors" :key="i">
-                <span class="err-meta">{{ formatDateTime(e.at) }} · {{ kindLabel(e.kind) }}{{ e.model ? ` · ${e.model}` : '' }}</span>
+                <span class="err-meta">{{ formatDateTime(e.at) }} · {{ aiKindLabel(e.kind) }}{{ e.model ? ` · ${e.model}` : '' }}</span>
                 <span class="err-msg">{{ e.error }}</span>
               </li>
             </ul>

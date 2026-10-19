@@ -39,11 +39,20 @@ export async function authenticateApiToken(event: H3Event): Promise<TokenOwner> 
   const t = tables.apiTokens
   const now = new Date()
   const [row] = await useDb()
-    .select({ id: t.id, scope: t.scope, userId: tables.users.id, name: tables.users.name, email: tables.users.email })
+    .select({
+      id: t.id,
+      scope: t.scope,
+      userId: tables.users.id,
+      name: tables.users.name,
+      email: tables.users.email,
+      disabledAt: tables.users.disabledAt,
+    })
     .from(t)
     .innerJoin(tables.users, eq(tables.users.id, t.userId))
     .where(and(eq(t.tokenHash, hashApiToken(token)), or(isNull(t.expiresAt), gt(t.expiresAt, now))))
   if (!row) throw new TokenError('访问令牌无效、已过期或已被撤销，请在网站的"接入 AI 工具"页面重新创建')
+  // 令牌不删，账号重新启用后还能接着用
+  if (row.disabledAt) throw new TokenError('这个账号已被管理员停用，访问令牌暂时不能使用')
 
   if (now.getTime() - (touched.get(row.id) ?? 0) > 60_000) {
     touched.set(row.id, now.getTime())

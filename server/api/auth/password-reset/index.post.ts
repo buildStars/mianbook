@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
   // 没注册的邮箱拿不到验证码，按"没有获取验证码"处理，提示和注册过的邮箱一样
   if (!row) throw createError({ statusCode: 400, message: '请先获取邮箱验证码' })
   await consumeEmailCode(body.email, 'reset', body.code)
+  // 验证码对了说明是邮箱的主人，可以告诉对方账号已停用；停用前发出的验证码也不能用来登录
+  if (row.disabledAt) throw createError({ statusCode: 403, message: '这个账号已被管理员停用，不能重置密码，如有疑问请联系管理员' })
 
   await db.update(tables.users).set({ passwordHash: await hashPassword(body.password) }).where(eq(tables.users.id, row.id))
   const sessionVersion = await bumpSessionVersion(row.id, row.sessionVersion)

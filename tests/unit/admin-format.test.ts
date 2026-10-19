@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { compactNumber, formatSeconds, relativeTime } from '../../app/utils/admin-format'
+import { compactNumber, formatMoney, formatMs, formatSeconds, relativeTime } from '../../app/utils/admin-format'
+import { aiKindLabel } from '../../shared/utils/ai-kinds'
 
 describe('后台的数字和时间格式', () => {
   const now = new Date('2026-10-12T12:00:00Z').getTime()
@@ -27,5 +28,21 @@ describe('后台的数字和时间格式', () => {
     expect(formatSeconds(30)).toBe('不到 1 分钟')
     expect(formatSeconds(35 * 60)).toBe('35 分钟')
     expect(formatSeconds(150 * 60)).toBe('2.5 小时')
+  })
+
+  it('耗时和金额', () => {
+    expect(formatMs(null)).toBe('—')
+    expect(formatMs(850)).toBe('850ms')
+    expect(formatMs(2345)).toBe('2.3s')
+    expect(formatMoney({ amount: 12.3, currency: 'CNY' })).toBe('¥12.30')
+    expect(formatMoney({ amount: 0, currency: 'USD' })).toBe('$0.00')
+    // 单个用户的费用可能不到一分钱，不显示成 0
+    expect(formatMoney({ amount: 0.0034, currency: 'CNY' })).toBe('不到 ¥0.01')
+  })
+
+  it('AI 功能名：自己的 Key 和站点 Key 显示同一个名字', () => {
+    expect(aiKindLabel('interview')).toBe('AI 单题面试')
+    expect(aiKindLabel('ask-own')).toBe('问手册')
+    expect(aiKindLabel('unknown-kind')).toBe('unknown-kind')
   })
 })
