@@ -328,5 +328,25 @@
     "q": "单元测试里直接调了真的大模型接口，又慢又花钱结果还不稳定，测试该怎么写",
     "expect": ["engineering/cicd/05-llm-app-testing"],
     "type": "scenario"
+  },
+  {
+    "q": "商品列表里点一张图要弹窗看详情，地址栏也跟着变，用户刷新或者把链接发给别人时直接显示完整的详情页，Next.js 里怎么做",
+    "expect": ["basics/nextjs/04-parallel-intercepting-routes"],
+    "type": "scenario"
+  },
+  {
+    "q": "我在 next 的 proxy 里判断 cookie，没登录就跳登录页，那接口和 server action 里是不是就不用再校验了",
+    "expect": ["basics/nextjs/06-proxy", "basics/nextjs/15-security"],
+    "type": "colloquial"
+  },
+  {
+    "q": "nuxt 项目本地 .env 里配的接口地址好好的，打包部署到服务器上就读不到了咋回事",
+    "expect": ["basics/nuxt/13-runtime-config"],
+    "type": "colloquial"
+  },
+  {
+    "q": "Nuxt 里怎么给不同页面分别设置构建时生成静态页、定时缓存还是只在浏览器渲染",
+    "expect": ["basics/nuxt/06-rendering-route-rules"],
+    "type": "paraphrase"
   }
 ]

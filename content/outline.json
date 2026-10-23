@@ -14,6 +14,8 @@
       { "slug": "vue", "title": "Vue" },
       { "slug": "react", "title": "React" },
       { "slug": "ssr", "title": "SSR 与全栈框架" },
+      { "slug": "nextjs", "title": "Next.js" },
+      { "slug": "nuxt", "title": "Nuxt" },
       { "slug": "build", "title": "前端工程化" },
       { "slug": "cross-platform", "title": "跨端开发" },
       { "slug": "node", "title": "Node.js" },
