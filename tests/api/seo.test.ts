@@ -53,6 +53,33 @@ describe('搜索引擎和分享卡片', () => {
     for (const p of ['/', '/mock', '/ask']) expect(await robots(p), p).toBeNull()
   })
 
+  it('目录不进页面 payload：按版本号单独请求，当前版本永久缓存', async () => {
+    const res = await fetch(`${baseUrl()}/api/outline`)
+    const version = res.headers.get('x-outline-version')!
+    expect(version).toMatch(/^[0-9a-f]{12}$/)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    const cached = await fetch(`${baseUrl()}/api/outline?v=${version}`)
+    expect(cached.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(await cached.json()).toEqual(await res.json())
+    expect((await fetch(`${baseUrl()}/api/outline?v=000000000000`)).headers.get('cache-control')).toBe('no-store')
+
+    const outline = await (await fetch(`${baseUrl()}/api/outline`)).json()
+    const cat = outline[0].categories[0]
+    const html = await (await fetch(baseUrl() + cat.questions[0].path)).text()
+    expect(html).toContain(`<link rel="preload" as="fetch" href="/api/outline?v=${version}" crossorigin="anonymous">`)
+    const payload = html.match(/<script type="application\/json"[^>]*id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)![1]!
+    // 其他分类的题目标题不在 payload 里
+    const otherTitle = outline.at(-1).categories.at(-1).questions.at(-1).title
+    expect(payload).not.toContain(otherTitle)
+    // 侧栏只渲染当前分类的题目
+    const sidebar = html.match(/<aside[^>]*class="sidebar"[\s\S]*?<\/aside>/)![0]
+    expect(sidebar.match(/<a [^>]*href="\/[^"]+\/[^"]+\/[^"]+"/g)).toHaveLength(cat.questions.length)
+
+    const home = await (await fetch(`${baseUrl()}/`)).text()
+    const homePayload = home.match(/<script type="application\/json"[^>]*id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)![1]!
+    expect(homePayload.length).toBeLessThan(5000)
+  })
+
   it('图标、manifest 和分享图片都能访问', async () => {
     for (const [p, type] of [
       ['/favicon.ico', 'image/'],

@@ -18,8 +18,9 @@ if (error.value || !question.value) {
 const pageTitle = computed(() => {
   if (!question.value) return ''
   const cat = question.value.category.title
-  // 分类名以英文结尾时（JavaScript、Next.js）中间空一格，中文分类直接连写
-  return `${plainTitle(question.value.title)} · ${cat}${/[\x21-\x7e]$/.test(cat) ? ' ' : ''}面试题`
+  // 分类名以英文结尾时（JavaScript、Next.js）中间空一格，中文分类直接连写；"前端手写题"这类本身带"题"的不再加
+  const suffix = cat.endsWith('题') ? '' : `${/[\x21-\x7e]$/.test(cat) ? ' ' : ''}面试题`
+  return `${plainTitle(question.value.title)} · ${cat}${suffix}`
 })
 useSeoMeta({
   title: pageTitle,

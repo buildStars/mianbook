@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { asc, eq } from 'drizzle-orm'
 import type { OutlinePart, OutlineQuestion, QuestionDetail } from '#shared/types/handbook'
 
@@ -64,6 +65,19 @@ export function getOutline(): Promise<OutlinePart[]> {
     throw error
   })
   return outlineCache
+}
+
+const outlineVersions = new WeakMap<OutlinePart[], string>()
+
+/** 目录内容的哈希：浏览器按它请求 /api/outline?v=…，同一个版本可以永久缓存 */
+export async function getOutlineVersion(): Promise<string> {
+  const outline = await getOutline()
+  let version = outlineVersions.get(outline)
+  if (!version) {
+    version = createHash('sha1').update(JSON.stringify(outline)).digest('hex').slice(0, 12)
+    outlineVersions.set(outline, version)
+  }
+  return version
 }
 
 export interface LocatedQuestion {

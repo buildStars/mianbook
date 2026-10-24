@@ -85,7 +85,8 @@ onMounted(() =>
           <span class="group-count num">{{ masteredIn(cat.questions.map((q) => q.id)) }}/{{ cat.questions.length }}</span>
           <svg :class="{ rotated: isCollapsed(cat.id) }" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
         </button>
-        <ul v-show="!isCollapsed(cat.id)">
+        <!-- 收起的分类不渲染：全栈基础有几百道题，全部输出会让每个题目页的 HTML 多出近 200 KB -->
+        <ul v-if="!isCollapsed(cat.id)">
           <li v-for="q in cat.questions" :key="q.id">
             <NuxtLink :to="q.path" class="item" :class="{ active: route.path === q.path }" :title="`${q.num}. ${plainTitle(q.title)}`">
               <span class="no num">{{ String(q.num).padStart(2, '0') }}</span>
