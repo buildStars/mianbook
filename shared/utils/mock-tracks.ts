@@ -32,6 +32,7 @@ export const MOCK_TRACKS: MockTrack[] = [
       'basics/nuxt',
       'basics/build',
       'basics/cross-platform',
+      'basics/frontend-design',
     ],
   },
   {

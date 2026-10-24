@@ -358,5 +358,25 @@
     "q": "写了个 Node 数据迁移脚本，逻辑都跑完了，终端却一直卡着不结束，要按 Ctrl+C 才退出",
     "expect": ["basics/node/24-process-exit-handles"],
     "type": "scenario"
+  },
+  {
+    "q": "要给公司所有前端项目统一收集 JS 报错和页面性能，从 SDK 采集到告警整套系统怎么搭",
+    "expect": ["basics/frontend-design/01-monitoring-platform", "basics/browser/20-monitoring"],
+    "type": "scenario"
+  },
+  {
+    "q": "两个人同时在一份在线文档里改同一句话，最后怎么保证大家看到的内容是一样的",
+    "expect": ["basics/frontend-design/03-collaborative-editing"],
+    "type": "colloquial"
+  },
+  {
+    "q": "nuxt 页面里引了一个图表库，一刷新就报 window is not defined",
+    "expect": ["basics/nuxt/17-client-only-code"],
+    "type": "colloquial"
+  },
+  {
+    "q": "封装公司内部的表格组件时，怎么让外面照样能用 el-table 原来的属性、事件和插槽",
+    "expect": ["basics/vue/28-component-wrapper"],
+    "type": "scenario"
   }
 ]
