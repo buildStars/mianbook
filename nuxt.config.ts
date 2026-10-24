@@ -123,6 +123,12 @@ export default defineNuxtConfig({
       codePerIpDaily: 30,
       codeDailyTotal: 500,
     },
+    // TalkCue（面试提词助手）从内网查题库用的接口 /api/internal/talkcue-search：token 没配置时接口不存在。
+    // minSimilarity 是"题库里有答案"的向量相似度门槛，见 server/utils/talkcue.ts
+    talkcue: {
+      token: '',
+      minSimilarity: 0.62,
+    },
     public: {
       siteName: '面书',
       // 对外的网址：canonical、分享卡片、sitemap 里的绝对地址都用它，部署到别的域名时用 NUXT_PUBLIC_SITE_URL 覆盖
