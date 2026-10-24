@@ -260,7 +260,8 @@ const formatTime = (iso: string) =>
             <div class="bubble"><span class="round">第 {{ i + 1 }} 轮</span>{{ askedAt(i) }}</div>
           </div>
           <div class="msg me"><div class="bubble">{{ turn.answer }}</div></div>
-          <InterviewFeedback :text="turn.feedback" :score="turn.score" />
+          <!-- 追问会作为下一轮的问题出现，卡片里不再重复 -->
+          <InterviewFeedback :text="turn.feedback" :score="turn.score" hide-follow-up />
         </template>
 
         <template v-if="!finished">
@@ -341,7 +342,7 @@ const formatTime = (iso: string) =>
             <template v-for="(turn, i) in item.turns" :key="turn.at">
               <p class="q">问：{{ i === 0 ? plainTitle(question.title) : item.turns[i - 1]?.followUp }}</p>
               <p class="a">答：{{ turn.answer }}</p>
-              <InterviewFeedback :text="turn.feedback" :score="turn.score" />
+              <InterviewFeedback :text="turn.feedback" :score="turn.score" :hide-follow-up="i < item.turns.length - 1" />
             </template>
           </div>
         </li>

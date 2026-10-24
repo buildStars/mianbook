@@ -12,13 +12,9 @@ interface SearchDoc {
   category: string
 }
 
-// 中文没有空格分词，用 Intl.Segmenter 按词切分
-const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' })
-function tokenize(text: string): string[] {
-  const words: string[] = []
-  for (const s of segmenter.segment(text)) if (s.isWordLike) words.push(s.segment)
-  return words
-}
+// 分词和问手册的关键词检索共用：Intl.Segmenter 词典里没有的词（如"闭包"）会被切成单字，
+// 单字再加前缀匹配会误中"闭环""包住"，所以连续单字两两组成双字词
+const tokenize = tokenizeSearchText
 
 let indexPromise: Promise<{ index: MiniSearch<SearchDoc>; docs: Map<number, SearchDoc> }> | null = null
 

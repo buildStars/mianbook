@@ -236,7 +236,8 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
               <div class="bubble"><span class="round">{{ i === 0 ? '面试官' : '追问' }}</span>{{ askedAt(i) }}</div>
             </div>
             <div class="msg me"><div class="bubble">{{ turn.answer }}</div></div>
-            <InterviewFeedback :text="turn.feedback" :score="turn.score" />
+            <!-- 追问会作为下一轮的问题出现时，卡片里不再重复 -->
+            <InterviewFeedback :text="turn.feedback" :score="turn.score" :hide-follow-up="i < item.turns.length - 1 || !item.done" />
           </template>
 
           <template v-if="!item.done">
@@ -350,7 +351,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
                 <template v-for="(turn, k) in it.turns" :key="turn.at">
                   <p class="q">问：{{ k === 0 ? plainTitle(it.question.title) : it.turns[k - 1]?.followUp }}</p>
                   <p class="a">答：{{ turn.answer }}</p>
-                  <InterviewFeedback :text="turn.feedback" :score="turn.score" />
+                  <InterviewFeedback :text="turn.feedback" :score="turn.score" :hide-follow-up="k < it.turns.length - 1" />
                 </template>
                 <div v-if="it.points?.length" class="points">
                   <p>这道题想考察：</p>
