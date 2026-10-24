@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   if (!path || isBotUserAgent(getRequestHeader(event, 'user-agent'))) return null
   if (!allow(clientIp(event) ?? body.visitorId)) return null
   const session = await getUserSession(event)
-  if (session.user?.role === 'admin') return null
+  if (session.user && (await isAdminUser(session.user.id))) return null
 
   const siteHosts = [new URL(useRuntimeConfig().public.siteUrl).hostname, getRequestHost(event).split(':')[0]!]
   await useDb()
