@@ -29,6 +29,8 @@ services:
       NUXT_DATABASE_URL: mysql://handbook:${DB_PASSWORD}@mysql:3306/handbook
       # 应用在 Caddy 后面，用 X-Forwarded-For 识别用户 IP（Caddy 会覆盖客户端伪造的值），验证码按 IP 限流要用到
       NUXT_AUTH_TRUST_PROXY: 'true'
+      # canonical、分享卡片、sitemap 里的绝对地址
+      NUXT_PUBLIC_SITE_URL: https://${DOMAIN:?}
     depends_on:
       mysql: { condition: service_healthy }
 

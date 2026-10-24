@@ -48,6 +48,8 @@ export interface QuestionDetail {
   difficulty: number
   tags: string[]
   html: string
+  /** 一句话回答的纯文本（截断到约 110 字），用作页面描述 */
+  summary: string
   toc: TocItem[]
   path: string
   part: { slug: string; title: string }

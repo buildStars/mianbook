@@ -104,6 +104,7 @@ export async function getQuestionDetail(path: string): Promise<QuestionDetail | 
     difficulty: row.difficulty,
     tags: row.tags,
     html: row.contentHtml,
+    summary: answerSummary(row.contentMd),
     toc: row.toc,
     path,
     part: { slug: located.part.slug, title: located.part.title },

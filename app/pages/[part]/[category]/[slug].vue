@@ -14,9 +14,22 @@ if (error.value || !question.value) {
   throw createError({ statusCode: 404, statusMessage: '这道题不存在或还没有发布', fatal: true })
 }
 
-useHead(() => ({
-  title: question.value ? plainTitle(question.value.title) : '',
-}))
+// 标题带上分类（"…… · JavaScript 面试题"），描述用一句话回答：搜索结果和分享卡片都靠它们
+const pageTitle = computed(() => {
+  if (!question.value) return ''
+  const cat = question.value.category.title
+  // 分类名以英文结尾时（JavaScript、Next.js）中间空一格，中文分类直接连写
+  return `${plainTitle(question.value.title)} · ${cat}${/[\x21-\x7e]$/.test(cat) ? ' ' : ''}面试题`
+})
+useSeoMeta({
+  title: pageTitle,
+  description: () => question.value?.summary,
+  ogTitle: pageTitle,
+  ogDescription: () => question.value?.summary,
+  ogType: 'article',
+  articleModifiedTime: () => question.value?.updatedAt,
+  articleSection: () => question.value?.category.title,
+})
 
 const quiz = useQuizMode()
 const revealed = ref(false)

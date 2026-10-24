@@ -38,6 +38,21 @@ export default defineNuxtConfig({
     },
   },
 
+  // 个人页面、账号页面和后台不让搜索引擎收录（robots.txt 只挡接口，页面靠这个响应头）
+  routeRules: {
+    '/admin/**': { headers: { 'X-Robots-Tag': 'noindex' } },
+    // 只挡具体的面试记录；/mock 本身是功能介绍页，要收录（/mock/** 会连 /mock 一起匹配）
+    '/mock/*': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/mock/agent/*': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/progress': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/review': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/report': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/connect': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/login': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/register': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/forgot-password': { headers: { 'X-Robots-Tag': 'noindex' } },
+  },
+
   colorMode: {
     classSuffix: '',
     preference: 'system',
@@ -110,6 +125,8 @@ export default defineNuxtConfig({
     },
     public: {
       siteName: '面书',
+      // 对外的网址：canonical、分享卡片、sitemap 里的绝对地址都用它，部署到别的域名时用 NUXT_PUBLIC_SITE_URL 覆盖
+      siteUrl: 'https://mianbook.ink',
     },
   },
 })

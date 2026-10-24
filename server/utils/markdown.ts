@@ -126,6 +126,26 @@ export function markdownToText(src: string): string {
     .trim()
 }
 
+/**
+ * 题目摘要，用作页面描述和分享卡片的文字：取"一句话回答"的纯文本（没有就取正文开头），
+ * 超过 max 个字时尽量在句末截断
+ */
+export function answerSummary(src: string, max = 110): string {
+  const tip = src.match(/^::: tip 一句话回答[^\n]*\n([\s\S]*?)\n:::\s*$/m)
+  // 行内代码先换成占位符，原样保留里面的 | * _ 等字符（如 `prompt | model`、`__proto__`）
+  const codes: string[] = []
+  // 代码段可以用多个反引号包住（`` `on${Name}` ``），首尾各去掉一个空格，规则同 CommonMark
+  const masked = (tip ? tip[1]! : src).replace(/(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (_, _ticks: string, code: string) => {
+    return `\u0000${codes.push(code.replace(/^ ([\s\S]*) $/, '$1')) - 1}\u0000`
+  })
+  // 加粗、删除线标记直接去掉，不像搜索文本那样换成空格，免得中文之间多出空格
+  const text = markdownToText(masked.replace(/\*\*|__|~~/g, '')).replace(/\u0000(\d+)\u0000/g, (_, i: string) => codes[Number(i)]!)
+  if (text.length <= max) return text
+  const cut = text.slice(0, max)
+  const end = Math.max(...['。', '；', '！', '？'].map((p) => cut.lastIndexOf(p)))
+  return end >= max * 0.6 ? cut.slice(0, end + 1) : `${cut.slice(0, max - 1)}…`
+}
+
 function escapeAttr(value: string) {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 }
