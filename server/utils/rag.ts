@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import type { RagRerankInfo } from '#shared/types/ask'
+import { keepAliveFetch } from './keep-alive-fetch'
 import {
   bufferToVector,
   buildRetriever,
@@ -118,7 +119,8 @@ async function embedQuery(target: EmbedTarget, query: string): Promise<Float32Ar
     queryCache.set(key, cached)
     return cached
   }
-  const { vectors } = await embedTexts(target, [query], AbortSignal.timeout(10_000))
+  // 问题之间常常隔几十秒：用保持连接的 fetch，省掉每次重新握手的 0.2–0.3 秒
+  const { vectors } = await embedTexts(target, [query], AbortSignal.timeout(10_000), keepAliveFetch)
   queryCache.set(key, vectors[0]!)
   if (queryCache.size > QUERY_CACHE_SIZE) queryCache.delete(queryCache.keys().next().value!)
   return vectors[0]!
@@ -188,7 +190,7 @@ export async function searchHandbook(query: string, options: HandbookSearchOptio
     } else {
       const t0 = performance.now()
       try {
-        const { scores } = await rerankTexts(reranker, query, rerankDocuments(pool), AbortSignal.timeout(reranker.timeoutMs))
+        const { scores } = await rerankTexts(reranker, query, rerankDocuments(pool), AbortSignal.timeout(reranker.timeoutMs), keepAliveFetch)
         rerankCache.set(cacheKey, scores)
         if (rerankCache.size > RERANK_CACHE_SIZE) rerankCache.delete(rerankCache.keys().next().value!)
         hits = reorder(scores)

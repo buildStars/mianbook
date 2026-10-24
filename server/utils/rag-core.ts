@@ -203,18 +203,19 @@ export class EmbedError extends Error {
   }
 }
 
-/** 调用 OpenAI 兼容的 /embeddings 接口，按批次请求，返回归一化后的向量 */
+/** 调用 OpenAI 兼容的 /embeddings 接口，按批次请求，返回归一化后的向量。fetchImpl：服务端传保持连接的 fetch */
 export async function embedTexts(
   target: EmbedTarget,
   texts: string[],
   signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<{ vectors: Float32Array[]; tokens: number }> {
   const size = Math.max(1, target.batchSize ?? 16)
   const vectors: Float32Array[] = []
   let tokens = 0
   for (let i = 0; i < texts.length; i += size) {
     const input = texts.slice(i, i + size)
-    const res = await fetch(`${target.baseUrl.replace(/\/+$/, '')}/embeddings`, {
+    const res = await fetchImpl(`${target.baseUrl.replace(/\/+$/, '')}/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
       body: JSON.stringify({ model: target.model, input, encoding_format: 'float' }),
@@ -456,9 +457,10 @@ export async function rerankTexts(
   query: string,
   documents: string[],
   signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<{ scores: number[]; tokens: number }> {
   if (!documents.length) return { scores: [], tokens: 0 }
-  const res = await fetch(`${target.baseUrl.replace(/\/+$/, '')}/rerank`, {
+  const res = await fetchImpl(`${target.baseUrl.replace(/\/+$/, '')}/rerank`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.apiKey}` },
     body: JSON.stringify({ model: target.model, query, documents, top_n: documents.length, return_documents: false }),

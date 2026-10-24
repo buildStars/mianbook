@@ -6,6 +6,7 @@ import {
   chunkQuestion,
   cleanMarkdown,
   embedInput,
+  embedTexts,
   fuseRerank,
   normalizeVector,
   previewText,
@@ -281,6 +282,23 @@ describe('重排', () => {
     const calls = stubFetch(() => Response.json({ results: [] }))
     expect(await rerankTexts(target, 'q', [])).toEqual({ scores: [], tokens: 0 })
     expect(calls).toHaveLength(0)
+  })
+
+  it('服务端传进来的 fetch（保持连接）用于重排和向量请求，不走全局 fetch', async () => {
+    const global = stubFetch(() => Response.json({}))
+    const used: string[] = []
+    const own = (async (url: string) => {
+      used.push(url)
+      return url.endsWith('/rerank')
+        ? Response.json({ results: [{ index: 0, relevance_score: 0.9 }] })
+        : Response.json({ data: [{ index: 0, embedding: [3, 4] }], usage: { total_tokens: 2 } })
+    }) as unknown as typeof fetch
+    expect((await rerankTexts(target, 'q', ['a'], undefined, own)).scores).toEqual([0.9])
+    const embed = { baseUrl: 'https://embed.test/v1', apiKey: 'k', model: 'bge-m3' }
+    const { vectors } = await embedTexts(embed, ['q'], undefined, own)
+    expect(Array.from(vectors[0]!, (x) => Math.round(x * 1000) / 1000)).toEqual([0.6, 0.8])
+    expect(used).toEqual(['https://rerank.test/v1/rerank', 'https://embed.test/v1/embeddings'])
+    expect(global).toHaveLength(0)
   })
 })
 
