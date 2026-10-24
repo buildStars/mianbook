@@ -34,13 +34,26 @@ export interface TalkcueHit {
 }
 
 /**
- * 混合检索的结果里，只留和问题足够相关的块，按原来的顺序，最多 limit 块。
- * 只出现在关键词结果里、没有相似度的块不算：没有证据说明它真的在回答这个问题
+ * 比最相关的一块低这么多的就不要了：问"浏览器的事件循环"时，事件委托、多进程这些题
+ * 也过了 0.62，但明显不是在答这个问题，塞给模型只会分散注意力
  */
-export function talkcueHits(hits: RetrievalHit[], siteUrl: string, options: { limit: number; minSimilarity: number }): TalkcueHit[] {
+export const TALKCUE_MAX_GAP = 0.1
+
+/**
+ * 混合检索的结果里，只留和问题足够相关的块：不低于 minSimilarity，也不比最相关的一块低 maxGap 以上，
+ * 按原来的顺序，最多 limit 块。只出现在关键词结果里、没有相似度的块不算：没有证据说明它真的在回答这个问题
+ */
+export function talkcueHits(
+  hits: RetrievalHit[],
+  siteUrl: string,
+  options: { limit: number; minSimilarity: number; maxGap?: number },
+): TalkcueHit[] {
   const base = siteUrl.replace(/\/+$/, '')
-  return hits
-    .filter((h) => h.similarity !== null && h.similarity >= options.minSimilarity)
+  const relevant = hits.filter((h) => h.similarity !== null && h.similarity >= options.minSimilarity)
+  const best = Math.max(...relevant.map((h) => h.similarity!))
+  const floor = best - (options.maxGap ?? TALKCUE_MAX_GAP)
+  return relevant
+    .filter((h) => h.similarity! >= floor)
     .slice(0, options.limit)
     .map((h) => ({
       title: h.chunk.title,
