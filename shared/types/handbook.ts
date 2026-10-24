@@ -56,6 +56,34 @@ export interface QuestionDetail {
   category: { slug: string; title: string }
   prev: QuestionLink | null
   next: QuestionLink | null
+  /** 题目页底部推荐的相关题目（不含上一题、下一题） */
+  related: RelatedQuestion[]
+  updatedAt: string
+}
+
+export interface RelatedQuestion extends QuestionLink {
+  id: number
+  category: string
+  difficulty: number
+}
+
+/** 分类专题页：/[part]/[category] */
+export interface CategoryDetail {
+  part: { slug: string; title: string }
+  category: { id: number; slug: string; title: string }
+  questions: {
+    id: number
+    num: number
+    title: string
+    path: string
+    difficulty: number
+    tags: string[]
+    /** 一句话回答的纯文本 */
+    summary: string
+  }[]
+  /** 同一部分的其他分类 */
+  siblings: { title: string; path: string; count: number }[]
+  /** 这个分类里最近一次修改的时间 */
   updatedAt: string
 }
 

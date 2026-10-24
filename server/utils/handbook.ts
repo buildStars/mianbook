@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { asc, eq } from 'drizzle-orm'
-import type { OutlinePart, OutlineQuestion, QuestionDetail } from '#shared/types/handbook'
+import { asc, eq, inArray } from 'drizzle-orm'
+import type { CategoryDetail, OutlinePart, OutlineQuestion, QuestionDetail } from '#shared/types/handbook'
 
 let outlineCache: Promise<OutlinePart[]> | null = null
 
@@ -111,6 +111,12 @@ export async function getQuestionDetail(path: string): Promise<QuestionDetail | 
   const [row] = await useDb().select().from(tables.questions).where(eq(tables.questions.id, located.question.id))
   if (!row) return null
   const link = (q: OutlineQuestion | null) => (q ? { title: q.title, path: q.path } : null)
+  const summary = answerSummary(row.contentMd)
+  // 相关题目算不出来不影响题目页
+  const related = await relatedQuestions(located).catch((error) => {
+    console.error('[related] 计算相关题目失败', error)
+    return []
+  })
   return {
     id: row.id,
     num: located.question.num,
@@ -118,13 +124,45 @@ export async function getQuestionDetail(path: string): Promise<QuestionDetail | 
     difficulty: row.difficulty,
     tags: row.tags,
     html: row.contentHtml,
-    summary: answerSummary(row.contentMd),
+    summary,
     toc: row.toc,
     path,
     part: { slug: located.part.slug, title: located.part.title },
     category: { slug: located.category.slug, title: located.category.title },
     prev: link(located.prev),
     next: link(located.next),
+    related,
     updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+/** 分类专题页：分类下的全部题目（带一句话回答的摘要）和同一部分的其他分类 */
+export async function getCategoryDetail(partSlug: string, categorySlug: string): Promise<CategoryDetail | null> {
+  const part = (await getOutline()).find((p) => p.slug === partSlug)
+  const cat = part?.categories.find((c) => c.slug === categorySlug)
+  if (!part || !cat) return null
+  const rows = await useDb()
+    .select({ id: tables.questions.id, contentMd: tables.questions.contentMd, tags: tables.questions.tags, updatedAt: tables.questions.updatedAt })
+    .from(tables.questions)
+    .where(inArray(tables.questions.id, cat.questions.map((q) => q.id)))
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  const latest = Math.max(0, ...rows.map((r) => r.updatedAt.getTime()))
+  return {
+    part: { slug: part.slug, title: part.title },
+    category: { id: cat.id, slug: cat.slug, title: cat.title },
+    questions: cat.questions.map((q) => ({
+      id: q.id,
+      num: q.num,
+      title: q.title,
+      path: q.path,
+      difficulty: q.difficulty,
+      tags: byId.get(q.id)?.tags ?? [],
+      // 卡片里只放两行，停在分号上读着像没说完，换成省略号
+      summary: answerSummary(byId.get(q.id)?.contentMd ?? '').replace(/；$/, '…'),
+    })),
+    siblings: part.categories
+      .filter((c) => c.id !== cat.id)
+      .map((c) => ({ title: c.title, path: `/${part.slug}/${c.slug}`, count: c.questions.length })),
+    updatedAt: new Date(latest).toISOString(),
   }
 }

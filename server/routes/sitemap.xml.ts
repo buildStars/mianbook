@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 
-/** 站点地图：首页、功能入口和全部已发布的题目，题目带最后修改时间 */
+/** 站点地图：首页、功能入口、分类专题页和全部已发布的题目，带最后修改时间 */
 export default defineEventHandler(async (event) => {
   const siteUrl = useRuntimeConfig().public.siteUrl
   const [outline, rows] = await Promise.all([
@@ -15,6 +15,9 @@ export default defineEventHandler(async (event) => {
   const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/mock' }, { loc: '/ask' }]
   for (const part of outline) {
     for (const cat of part.categories) {
+      // 分类专题页排在它的题目前面，最后修改时间取分类里最新的一道题
+      const dates = cat.questions.map((q) => updated.get(q.id)).filter((d): d is string => !!d)
+      urls.push({ loc: `/${part.slug}/${cat.slug}`, lastmod: dates.sort().at(-1) })
       for (const q of cat.questions) urls.push({ loc: q.path, lastmod: updated.get(q.id) })
     }
   }

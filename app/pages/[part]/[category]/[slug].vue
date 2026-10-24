@@ -15,13 +15,9 @@ if (error.value || !question.value) {
 }
 
 // 标题带上分类（"…… · JavaScript 面试题"），描述用一句话回答：搜索结果和分享卡片都靠它们
-const pageTitle = computed(() => {
-  if (!question.value) return ''
-  const cat = question.value.category.title
-  // 分类名以英文结尾时（JavaScript、Next.js）中间空一格，中文分类直接连写；"前端手写题"这类本身带"题"的不再加
-  const suffix = cat.endsWith('题') ? '' : `${/[\x21-\x7e]$/.test(cat) ? ' ' : ''}面试题`
-  return `${plainTitle(question.value.title)} · ${cat}${suffix}`
-})
+const pageTitle = computed(() =>
+  question.value ? `${plainTitle(question.value.title)} · ${categoryHeading(question.value.category.title)}` : '',
+)
 useSeoMeta({
   title: pageTitle,
   description: () => question.value?.summary,
@@ -79,6 +75,11 @@ watch(() => question.value?.id, remember)
 
       <InterviewPanel ref="interview" :question="question" />
       <DocsStudyPanel :question-id="question.id" />
+      <DocsRelated
+        :related="question.related"
+        :category-path="`/${question.part.slug}/${question.category.slug}`"
+        :category-title="question.category.title"
+      />
       <DocsFeedback :question-id="question.id" />
       <DocsPrevNext :prev="question.prev" :next="question.next" />
     </article>

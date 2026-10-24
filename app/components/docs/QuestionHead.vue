@@ -10,8 +10,6 @@ const { firstPathOf, outline } = useOutline()
 
 const starred = computed(() => !!records.value[props.question.id]?.starred)
 
-const level = computed(() => DIFFICULTY_LABELS[props.question.difficulty] ?? '')
-
 /** 按每分钟约 450 字估算阅读时间（代码按字符数算，略偏保守） */
 const minutes = computed(() => Math.max(1, Math.round(props.question.html.replace(/<[^>]+>/g, '').length / 450)))
 
@@ -19,10 +17,8 @@ const partLink = computed(() => {
   const part = outline.value.find((p) => p.slug === props.question.part.slug)
   return part ? firstPathOf(part) : '/'
 })
-const categoryLink = computed(() => {
-  const part = outline.value.find((p) => p.slug === props.question.part.slug)
-  return part?.categories.find((c) => c.slug === props.question.category.slug)?.questions[0]?.path ?? partLink.value
-})
+// 面包屑里的分类指向分类专题页
+const categoryLink = computed(() => '/' + props.question.part.slug + '/' + props.question.category.slug)
 </script>
 
 <template>
@@ -39,9 +35,7 @@ const categoryLink = computed(() => {
     <h1 class="title serif"><RichTitle :title="question.title" /></h1>
 
     <div class="meta">
-      <span class="level" :class="`lv-${question.difficulty}`" :title="`难度：${level}`">
-        <span class="bars" aria-hidden="true"><i /><i /><i /></span>{{ level }}
-      </span>
+      <DifficultyBadge :value="question.difficulty" />
       <span v-for="t in question.tags" :key="t" class="tag">{{ t }}</span>
       <span class="read">约 {{ minutes }} 分钟读完</span>
     </div>
@@ -130,42 +124,6 @@ const categoryLink = computed(() => {
   margin-top: 16px;
   font-size: 13px;
   color: var(--c-text-3);
-}
-
-.level {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 9px 0 8px;
-  border: 1px solid var(--c-divider);
-  border-radius: var(--r-sm);
-  background: var(--c-bg-elv);
-  color: var(--c-text-2);
-  font-size: 12px;
-}
-
-.bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 11px;
-}
-
-.bars i {
-  width: 3px;
-  border-radius: 1px;
-  background: var(--c-bg-mute);
-}
-
-.bars i:nth-child(1) { height: 5px; }
-.bars i:nth-child(2) { height: 8px; }
-.bars i:nth-child(3) { height: 11px; }
-
-.lv-1 .bars i:nth-child(-n + 1),
-.lv-2 .bars i:nth-child(-n + 2),
-.lv-3 .bars i:nth-child(-n + 3) {
-  background: var(--c-text-1);
 }
 
 .read {

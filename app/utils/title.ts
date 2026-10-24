@@ -10,6 +10,12 @@ export function titleSegments(title: string): { text: string; code: boolean }[] 
 
 export const plainTitle = (title: string) => title.replace(/`/g, '')
 
+/**
+ * 分类的"××面试题"叫法：分类名以英文结尾时（JavaScript、Next.js）中间空一格，中文直接连写；
+ * "前端手写题"这类本身带"题"的不再加
+ */
+export const categoryHeading = (title: string) => (title.endsWith('题') ? title : `${title}${/[\x21-\x7e]$/.test(title) ? ' ' : ''}面试题`)
+
 export const STATUS_LABELS = {
   weak: '不会',
   fuzzy: '模糊',

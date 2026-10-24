@@ -14,9 +14,12 @@ describe('搜索引擎和分享卡片', () => {
     expect(text).toContain(`Sitemap: ${SITE}/sitemap.xml`)
   })
 
-  it('sitemap.xml 列出首页、功能入口和全部已发布题目', async () => {
+  it('sitemap.xml 列出首页、功能入口、分类专题页和全部已发布题目', async () => {
     const outline = await (await fetch(`${baseUrl()}/api/outline`)).json()
-    const paths: string[] = outline.flatMap((p: any) => p.categories.flatMap((c: any) => c.questions.map((q: any) => q.path)))
+    // 每个分类专题页排在它的题目前面
+    const paths: string[] = outline.flatMap((p: any) =>
+      p.categories.flatMap((c: any) => [`/${p.slug}/${c.slug}`, ...c.questions.map((q: any) => q.path)]),
+    )
     const res = await fetch(`${baseUrl()}/sitemap.xml`)
     expect(res.headers.get('content-type')).toContain('application/xml')
     const xml = await res.text()

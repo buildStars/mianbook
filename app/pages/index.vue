@@ -196,7 +196,7 @@ const steps = [
               </span>
             </div>
             <div class="cats">
-              <NuxtLink v-for="cat in part.categories" :key="cat.id" :to="cat.questions[0]!.path" class="cat">
+              <NuxtLink v-for="cat in part.categories" :key="cat.id" :to="`/${part.slug}/${cat.slug}`" class="cat">
                 <span class="cat-title">{{ cat.title }}</span>
                 <span class="cat-count num">{{ cat.questions.length }}</span>
                 <span class="cat-bar"><i :style="{ width: `${catPct(cat.questions.map((q) => q.id))}%` }" /></span>
