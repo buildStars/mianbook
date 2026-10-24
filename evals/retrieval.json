@@ -348,5 +348,15 @@
     "q": "Nuxt 里怎么给不同页面分别设置构建时生成静态页、定时缓存还是只在浏览器渲染",
     "expect": ["basics/nuxt/06-rendering-route-rules"],
     "type": "paraphrase"
+  },
+  {
+    "q": "node 服务挂在 ALB 后面，半夜流量低的时候偶尔报 502，node 日志里却查不到这些请求",
+    "expect": ["basics/node/21-http-server-timeouts"],
+    "type": "colloquial"
+  },
+  {
+    "q": "写了个 Node 数据迁移脚本，逻辑都跑完了，终端却一直卡着不结束，要按 Ctrl+C 才退出",
+    "expect": ["basics/node/24-process-exit-handles"],
+    "type": "scenario"
   }
 ]
