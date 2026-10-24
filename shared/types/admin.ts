@@ -203,3 +203,27 @@ export interface AdminFeedbackRow {
   /** 没登录提交时为空 */
   user: { id: number; name: string; email: string } | null
 }
+
+/** 后台"访问"页：自建统计的汇总 */
+export interface AdminTraffic {
+  /** 统计最近几天（含今天） */
+  days: number
+  /** 每天的访客、浏览量和注册数，从早到晚 */
+  daily: { date: string; visitors: number; views: number; signups: number }[]
+  totals: {
+    visitors: number
+    views: number
+    signups: number
+    /** 这段时间注册、并且做过 AI 面试（单题、整场或 Agent）的用户 */
+    activated: number
+    /** 有两天以上来过的访客 */
+    returning: number
+  }
+  /** 访客 → 看过题目 → 注册 → 做过 AI 面试 */
+  funnel: { label: string; value: number }[]
+  topPages: { path: string; title: string; views: number; visitors: number }[]
+  /** 一次访问的第一页从哪来；直接打开或来源未知的 host 为空 */
+  referrers: { host: string | null; visitors: number }[]
+  utmSources: { source: string; visitors: number }[]
+  devices: { mobile: number; desktop: number }
+}

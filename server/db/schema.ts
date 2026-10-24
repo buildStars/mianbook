@@ -397,6 +397,33 @@ export const errorLogs = mysqlTable(
   (t) => [index('error_logs_created_idx').on(t.createdAt)],
 )
 
+/**
+ * 页面访问记录（自建统计，不用第三方）：访客 ID 是浏览器 localStorage 里的随机串，不存 IP 和 UA；
+ * 来源只记外站域名和 utm_source。后台"访问"页按天汇总，超过一年的记录自动删除
+ */
+export const pageViews = mysqlTable(
+  'page_views',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    visitorId: varchar('visitor_id', { length: 32 }).notNull(),
+    userId: int('user_id').references(() => users.id, { onDelete: 'set null' }),
+    /** 路径，不含查询参数 */
+    path: varchar('path', { length: 255 }).notNull(),
+    /** 是不是一次访问的第一页（浏览器标签页里第一次打开本站） */
+    entry: boolean('entry').notNull().default(false),
+    /** 从哪个外站来的，只记域名；站内跳转和直接打开为空 */
+    referrerHost: varchar('referrer_host', { length: 128 }),
+    utmSource: varchar('utm_source', { length: 64 }),
+    device: mysqlEnum('device', ['mobile', 'desktop']).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('page_views_created_idx').on(t.createdAt),
+    index('page_views_visitor_idx').on(t.visitorId, t.createdAt),
+    index('page_views_user_idx').on(t.userId, t.createdAt),
+  ],
+)
+
 /** 题目纠错和反馈：读者在题目页提交，后台处理。没登录也能提交，按 IP 限频，IP 只存哈希 */
 export const questionFeedback = mysqlTable(
   'question_feedback',

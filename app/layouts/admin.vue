@@ -7,7 +7,13 @@ const siteName = useRuntimeConfig().public.siteName
 const { user, clear } = useUserSession()
 
 const groups: { label: string; items: { path: string; label: string; icon: AdminIconName }[] }[] = [
-  { label: '运营', items: [{ path: '/admin', label: '概览', icon: 'dashboard' }] },
+  {
+    label: '运营',
+    items: [
+      { path: '/admin', label: '概览', icon: 'dashboard' },
+      { path: '/admin/traffic', label: '访问', icon: 'eye' },
+    ],
+  },
   {
     label: '内容',
     items: [
