@@ -6,6 +6,7 @@ useHead({ title: '问手册' })
 interface AiStatus {
   enabled: boolean
   remaining: number
+  dailyLimit: number
   extraHosts: string[]
   allowUserKey: boolean
 }
@@ -40,10 +41,41 @@ const allowOwnKey = computed(() => ai.value?.allowUserKey !== false)
 const canUse = computed(() => hasKey.value || Boolean(ai.value?.enabled))
 const showSettings = ref(false)
 
+/** 没登录时展示的示例问答：引用的是题库里真实的题，点编号就能看原题；题目不存在时那条引用自动去掉 */
+const DEMO_SOURCES = [
+  {
+    path: '/basics/javascript/01-event-loop',
+    snippet: '每一轮循环先执行一个宏任务，执行完后清空所有微任务，然后浏览器视情况渲染页面，再取下一个宏任务。',
+  },
+  {
+    path: '/basics/node/01-event-loop',
+    snippet: '同步代码最先执行；之后先清空 process.nextTick 队列，再清空 Promise 微任务队列；然后进入事件循环的各个阶段。',
+  },
+]
+const demoTurn = computed<AskTurnView>(() => {
+  const sources = DEMO_SOURCES.flatMap((s, i) => {
+    const q = all.value.find((x) => x.path === s.path)
+    return q ? [{ n: i + 1, questionId: q.id, title: q.title, path: q.path, category: q.categoryTitle, heading: '一句话回答', snippet: s.snippet }] : []
+  })
+  return {
+    id: 0,
+    question: 'Promise.then 和 setTimeout 谁先执行？Node.js 里也一样吗？',
+    answer:
+      '浏览器里每轮事件循环先执行一个宏任务，执行完立刻清空所有微任务，再视情况渲染、进入下一轮 [1]。所以在同一段同步代码里注册的 `Promise.then` 回调（微任务）会比 `setTimeout` 回调（宏任务）先执行 [1]。\n\n' +
+      'Node.js 里同样是同步代码跑完后先清空微任务，区别是 `process.nextTick` 队列比 Promise 微任务还要早；`setTimeout` 在 timers 阶段执行，`setImmediate` 在 check 阶段执行 [2]。',
+    sources,
+    citations: sources.map((s) => s.n),
+    phase: 'done',
+    error: '',
+  }
+})
+
 // 对话存在 useState 里：点引用去看原题，再返回时对话还在（刷新页面会清空，不存数据库）
 const turns = useState<AskTurnView[]>('ask-turns', () => [])
 const input = ref('')
 const remaining = ref<number | null>(null)
+/** 没登录、还没问过时先展示示例 */
+const shownTurns = computed(() => (!loggedIn.value && !turns.value.length ? [demoTurn.value] : turns.value))
 const busy = computed(() => turns.value.some((t) => t.phase === 'searching' || t.phase === 'answering'))
 const textarea = ref<HTMLTextAreaElement>()
 const list = ref<HTMLElement>()
@@ -67,6 +99,8 @@ function historyFor(turn: AskTurnView) {
 async function ask(text = input.value) {
   const question = text.trim()
   if (question.length < 2 || busy.value) return
+  // 没登录时先去注册，回来按 ?q= 自动接着问（见下面的 onMounted）
+  if (!loggedIn.value) return navigateTo({ path: '/register', query: { redirect: `/ask?q=${encodeURIComponent(question)}` } })
   input.value = ''
   const turn = reactive<AskTurnView>({ id: nextId++, question, answer: '', sources: [], citations: [], phase: 'searching', error: '' })
   turns.value.push(turn)
@@ -186,86 +220,90 @@ function onAnswerClick(e: MouseEvent) {
       </p>
     </header>
 
-    <div v-if="!loggedIn" class="notice card">
-      <p>问手册需要登录，每次回答会用掉一次 AI 次数。</p>
-      <NuxtLink to="/login?redirect=/ask" class="btn btn-primary">登录</NuxtLink>
+    <!-- 没登录也能看示例、输入问题，提问时再去注册 -->
+    <div v-if="loggedIn && !canUse" class="notice card">
+      <p>站点还没有配置 AI 服务{{ allowOwnKey ? '，可以填写你自己的 API Key 使用' : '' }}。</p>
+      <button v-if="allowOwnKey" type="button" class="btn btn-ai" @click="showSettings = true">填写我的 Key</button>
+    </div>
+    <InterviewAiSettings v-if="showSettings" class="settings" :extra-hosts="ai?.extraHosts ?? []" @close="showSettings = false" @saved="showSettings = false" />
+
+    <section v-if="!turns.length" class="examples" aria-label="示例问题">
+      <p class="examples-label">可以这样问</p>
+      <div class="examples-list">
+        <button v-for="q in EXAMPLES" :key="q" type="button" class="example" :disabled="loggedIn && !canUse" @click="ask(q)">{{ q }}</button>
+      </div>
+    </section>
+
+    <ol ref="list" class="turns">
+      <li v-for="turn in shownTurns" :key="turn.id" class="turn">
+        <p class="question"><span class="who">{{ turn.id === 0 ? '示例' : '你问' }}</span>{{ turn.question }}</p>
+
+        <article class="answer card ai-border" :aria-busy="turn.phase === 'searching' || turn.phase === 'answering'">
+          <div class="answer-head">
+            <span class="ai-text who">手册助手</span>
+            <span v-if="turn.phase === 'searching'" class="status">正在检索手册<span class="dots"><i /><i /><i /></span></span>
+            <span v-else-if="turn.phase === 'answering'" class="status">找到 {{ turn.sources.length }} 段资料，正在回答<span class="dots"><i /><i /><i /></span></span>
+          </div>
+          <p v-if="turn.phase === 'error'" class="error" role="alert">
+            {{ turn.error }}
+            <button type="button" class="btn btn-sm" @click="retry(turn)">重试</button>
+          </p>
+          <!-- 已转义原始 HTML 并禁用图片，见 renderAiMarkdown；引用链接只指向检索到的站内题目 -->
+          <div v-if="turn.answer" class="body" @click="onAnswerClick" v-html="renderAnswer(turn)" />
+
+          <details v-if="turn.sources.length" class="sources" :open="turn.phase !== 'answering'">
+            <summary>
+              参考了 {{ turn.sources.length }} 段手册内容<template v-if="turn.phase === 'done'">，引用了 {{ turn.citations.length }} 段</template>
+            </summary>
+            <ul>
+              <li v-for="g in sourceGroups(turn)" :key="g.questionId" class="group" :class="{ dim: turn.phase === 'done' && !g.cited }">
+                <NuxtLink :to="g.path" class="src-title"><RichTitle :title="g.title" /></NuxtLink>
+                <span class="src-meta">{{ g.category }}</span>
+                <div v-for="s in g.items" :key="s.n" class="src">
+                  <span class="n num" :class="{ on: turn.citations.includes(s.n) }">{{ s.n }}</span>
+                  <p class="src-snippet"><b>{{ s.heading }}</b>{{ s.snippet }}</p>
+                </div>
+              </li>
+            </ul>
+          </details>
+        </article>
+      </li>
+    </ol>
+
+    <div v-if="!loggedIn" class="signup card">
+      <p>
+        注册后就能提问<template v-if="ai?.enabled">，每天 <b>{{ ai.dailyLimit }}</b> 次免费</template>。回答只依据手册内容，每句话标出处；支持连续追问。
+      </p>
+      <SignupPrompt ai label="免费注册，开始提问" redirect="/ask" />
     </div>
 
-    <template v-else>
-      <div v-if="!canUse" class="notice card">
-        <p>站点还没有配置 AI 服务{{ allowOwnKey ? '，可以填写你自己的 API Key 使用' : '' }}。</p>
-        <button v-if="allowOwnKey" type="button" class="btn btn-ai" @click="showSettings = true">填写我的 Key</button>
+    <form class="composer card" @submit.prevent="ask()">
+      <textarea
+        ref="textarea"
+        v-model="input"
+        rows="2"
+        maxlength="500"
+        :disabled="loggedIn && !canUse"
+        :placeholder="turns.length ? '继续追问，比如：那它有什么缺点？' : '输入你的问题，比如：Redis 为什么这么快？'"
+        aria-label="问题"
+        @keydown="onKeydown"
+      />
+      <div class="composer-bar">
+        <span class="hint">
+          <template v-if="!loggedIn">提问前需要先注册，问题会带过去</template>
+          <template v-else-if="hasKey">使用你自己的 Key</template>
+          <template v-else-if="remaining !== null">24 小时内还可以问 {{ remaining }} 次</template>
+          <template v-else>Enter 发送，Shift + Enter 换行</template>
+        </span>
+        <div class="actions">
+          <button v-if="turns.length && !busy" type="button" class="btn btn-sm btn-ghost" @click="clearAll">清空对话</button>
+          <button v-if="busy" type="button" class="btn btn-sm" @click="stop">停止</button>
+          <button v-else type="submit" class="btn btn-sm btn-ai" :disabled="(loggedIn && !canUse) || input.trim().length < 2">
+            {{ loggedIn ? '提问' : '注册后提问' }}
+          </button>
+        </div>
       </div>
-      <InterviewAiSettings v-if="showSettings" class="settings" :extra-hosts="ai?.extraHosts ?? []" @close="showSettings = false" @saved="showSettings = false" />
-
-      <section v-if="!turns.length" class="examples" aria-label="示例问题">
-        <p class="examples-label">可以这样问</p>
-        <div class="examples-list">
-          <button v-for="q in EXAMPLES" :key="q" type="button" class="example" :disabled="!canUse" @click="ask(q)">{{ q }}</button>
-        </div>
-      </section>
-
-      <ol ref="list" class="turns">
-        <li v-for="turn in turns" :key="turn.id" class="turn">
-          <p class="question"><span class="who">你问</span>{{ turn.question }}</p>
-
-          <article class="answer card ai-border" :aria-busy="turn.phase === 'searching' || turn.phase === 'answering'">
-            <div class="answer-head">
-              <span class="ai-text who">手册助手</span>
-              <span v-if="turn.phase === 'searching'" class="status">正在检索手册<span class="dots"><i /><i /><i /></span></span>
-              <span v-else-if="turn.phase === 'answering'" class="status">找到 {{ turn.sources.length }} 段资料，正在回答<span class="dots"><i /><i /><i /></span></span>
-            </div>
-            <p v-if="turn.phase === 'error'" class="error" role="alert">
-              {{ turn.error }}
-              <button type="button" class="btn btn-sm" @click="retry(turn)">重试</button>
-            </p>
-            <!-- 已转义原始 HTML 并禁用图片，见 renderAiMarkdown；引用链接只指向检索到的站内题目 -->
-            <div v-if="turn.answer" class="body" @click="onAnswerClick" v-html="renderAnswer(turn)" />
-
-            <details v-if="turn.sources.length" class="sources" :open="turn.phase !== 'answering'">
-              <summary>
-                参考了 {{ turn.sources.length }} 段手册内容<template v-if="turn.phase === 'done'">，引用了 {{ turn.citations.length }} 段</template>
-              </summary>
-              <ul>
-                <li v-for="g in sourceGroups(turn)" :key="g.questionId" class="group" :class="{ dim: turn.phase === 'done' && !g.cited }">
-                  <NuxtLink :to="g.path" class="src-title"><RichTitle :title="g.title" /></NuxtLink>
-                  <span class="src-meta">{{ g.category }}</span>
-                  <div v-for="s in g.items" :key="s.n" class="src">
-                    <span class="n num" :class="{ on: turn.citations.includes(s.n) }">{{ s.n }}</span>
-                    <p class="src-snippet"><b>{{ s.heading }}</b>{{ s.snippet }}</p>
-                  </div>
-                </li>
-              </ul>
-            </details>
-          </article>
-        </li>
-      </ol>
-
-      <form class="composer card" @submit.prevent="ask()">
-        <textarea
-          ref="textarea"
-          v-model="input"
-          rows="2"
-          maxlength="500"
-          :disabled="!canUse"
-          :placeholder="turns.length ? '继续追问，比如：那它有什么缺点？' : '输入你的问题，比如：Redis 为什么这么快？'"
-          aria-label="问题"
-          @keydown="onKeydown"
-        />
-        <div class="composer-bar">
-          <span class="hint">
-            <template v-if="hasKey">使用你自己的 Key</template>
-            <template v-else-if="remaining !== null">24 小时内还可以问 {{ remaining }} 次</template>
-            <template v-else>Enter 发送，Shift + Enter 换行</template>
-          </span>
-          <div class="actions">
-            <button v-if="turns.length && !busy" type="button" class="btn btn-sm btn-ghost" @click="clearAll">清空对话</button>
-            <button v-if="busy" type="button" class="btn btn-sm" @click="stop">停止</button>
-            <button v-else type="submit" class="btn btn-sm btn-ai" :disabled="!canUse || input.trim().length < 2">提问</button>
-          </div>
-        </div>
-      </form>
-    </template>
+    </form>
   </div>
 </template>
 
@@ -301,6 +339,24 @@ function onAnswerClick(e: MouseEvent) {
 .notice p {
   margin: 0;
   color: var(--c-text-2);
+}
+
+/* 没登录时示例下面的注册提示 */
+.signup {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 20px 24px;
+  background: var(--ai-soft), var(--c-bg-elv);
+}
+
+.signup p {
+  margin: 0;
+  color: var(--c-text-2);
+}
+
+.signup b {
+  color: var(--c-text-1);
 }
 
 .settings {

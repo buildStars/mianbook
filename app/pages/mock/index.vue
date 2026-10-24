@@ -8,6 +8,7 @@ interface AiStatus {
   enabled: boolean
   model: string
   remaining: number
+  dailyLimit: number
   /** 管理员关闭了这个用户使用站点 AI 的权限 */
   blocked?: boolean
   extraHosts: string[]
@@ -67,7 +68,7 @@ watch(loggedIn, loadHistory)
 
 const canUse = computed(() => hasKey.value || Boolean(ai.value?.enabled))
 /** 出题方式：按方向从题库抽、按简历出项目深挖题，或者让 Agent 面试官自己决定 */
-const mode = ref<'bank' | 'resume' | 'agent'>(route.query.mode === 'agent' ? 'agent' : 'bank')
+const mode = ref<'bank' | 'resume' | 'agent'>(route.query.mode === 'agent' || route.query.mode === 'resume' ? route.query.mode : 'bank')
 const agentForm = reactive({ goal: '', maxQuestions: 5 })
 const resumeForm = reactive({ resume: '', role: '', projectCount: 4, bankCount: 3, followUps: 1 })
 
@@ -81,6 +82,30 @@ const estimate = computed(() =>
 )
 const perQuestion = computed(() => 1 + (mode.value === 'bank' ? form.followUps : resumeForm.followUps))
 const custom = computed(() => form.track === 'custom')
+
+// 未登录时先挑好方向、贴好简历，去注册前暂存在本机（sessionStorage，关掉标签页就没了），回来接着用
+const DRAFT_KEY = 'mock-draft'
+function saveDraft() {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ mode: mode.value, form, resumeForm, agentForm }))
+  } catch {
+    // 隐私模式等情况下存不了，不影响注册
+  }
+}
+onMounted(() => {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+    sessionStorage.removeItem(DRAFT_KEY)
+    const draft = JSON.parse(raw)
+    if (['bank', 'resume', 'agent'].includes(draft.mode)) mode.value = draft.mode
+    Object.assign(form, draft.form)
+    Object.assign(resumeForm, draft.resumeForm)
+    Object.assign(agentForm, draft.agentForm)
+  } catch {
+    // 草稿读不出来就算了
+  }
+})
 
 function toggleCategory(id: number) {
   const i = form.categoryIds.indexOf(id)
@@ -176,246 +201,246 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
       <p class="sub">选一个方向，AI 面试官连续提问。每道题打分、追问，结束后给出总结和复习建议，低分的题自动加入复习计划。</p>
     </header>
 
-    <div v-if="!loggedIn" class="notice card">
-      <p>模拟面试需要登录，面试记录和复习计划都保存在账号里。</p>
-      <NuxtLink to="/login?redirect=/mock" class="btn btn-primary">登录</NuxtLink>
-    </div>
+    <!-- 未登录也能先挑方向、看看怎么考，点开始时再去注册 -->
+    <NuxtLink v-if="active" :to="`/mock/${active.id}`" class="resume card">
+      <span class="resume-dot" aria-hidden="true" />
+      <span class="resume-text">
+        <b>有一场面试还没结束</b>
+        <span>{{ active.title }} · 已答 {{ active.answered }} / {{ active.count }} 题</span>
+      </span>
+      <span class="btn btn-sm btn-primary">继续面试</span>
+    </NuxtLink>
 
-    <template v-else>
-      <NuxtLink v-if="active" :to="`/mock/${active.id}`" class="resume card">
-        <span class="resume-dot" aria-hidden="true" />
-        <span class="resume-text">
-          <b>有一场面试还没结束</b>
-          <span>{{ active.title }} · 已答 {{ active.answered }} / {{ active.count }} 题</span>
-        </span>
-        <span class="btn btn-sm btn-primary">继续面试</span>
-      </NuxtLink>
+    <section class="setup card">
+      <div class="segmented mode" role="tablist" aria-label="出题方式">
+        <button type="button" role="tab" :aria-checked="mode === 'bank'" :aria-selected="mode === 'bank'" @click="mode = 'bank'">按方向出题</button>
+        <button type="button" role="tab" :aria-checked="mode === 'resume'" :aria-selected="mode === 'resume'" @click="mode = 'resume'">按简历出题</button>
+        <button type="button" role="tab" :aria-checked="mode === 'agent'" :aria-selected="mode === 'agent'" @click="mode = 'agent'">Agent 面试官</button>
+      </div>
 
-      <section class="setup card">
-        <div class="segmented mode" role="tablist" aria-label="出题方式">
-          <button type="button" role="tab" :aria-checked="mode === 'bank'" :aria-selected="mode === 'bank'" @click="mode = 'bank'">按方向出题</button>
-          <button type="button" role="tab" :aria-checked="mode === 'resume'" :aria-selected="mode === 'resume'" @click="mode = 'resume'">按简历出题</button>
-          <button type="button" role="tab" :aria-checked="mode === 'agent'" :aria-selected="mode === 'agent'" @click="mode = 'agent'">Agent 面试官</button>
+      <template v-if="mode === 'bank'">
+      <div class="field">
+        <p class="label">面试方向</p>
+        <div class="tracks" role="radiogroup" aria-label="面试方向">
+          <button
+            v-for="t in MOCK_TRACKS"
+            :key="t.id"
+            type="button"
+            role="radio"
+            class="track"
+            :aria-checked="form.track === t.id"
+            @click="form.track = t.id"
+          >
+            <b>{{ t.name }}</b>
+            <span>{{ t.desc }}</span>
+          </button>
+          <button type="button" role="radio" class="track" :aria-checked="custom" @click="form.track = 'custom'">
+            <b>自选分类</b>
+            <span>从题库里挑几个分类</span>
+          </button>
         </div>
+      </div>
 
-        <template v-if="mode === 'bank'">
-        <div class="field">
-          <p class="label">面试方向</p>
-          <div class="tracks" role="radiogroup" aria-label="面试方向">
+      <div v-if="custom" class="field">
+        <p class="label">选择分类 <span class="muted">（已选 {{ form.categoryIds.length }} 个）</span></p>
+        <div v-for="p in outline" :key="p.id" class="cat-group">
+          <span class="cat-part">{{ p.title }}</span>
+          <div class="chips">
             <button
-              v-for="t in MOCK_TRACKS"
-              :key="t.id"
+              v-for="c in p.categories"
+              :key="c.id"
+              type="button"
+              class="cat-chip"
+              :aria-pressed="form.categoryIds.includes(c.id)"
+              @click="toggleCategory(c.id)"
+            >
+              {{ c.title }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <p class="label">难度</p>
+          <div class="segmented" role="radiogroup" aria-label="难度">
+            <button
+              v-for="d in MOCK_DIFFICULTIES"
+              :key="d.value"
               type="button"
               role="radio"
-              class="track"
-              :aria-checked="form.track === t.id"
-              @click="form.track = t.id"
+              :aria-checked="form.difficulty === d.value"
+              :title="d.desc"
+              @click="form.difficulty = d.value"
             >
-              <b>{{ t.name }}</b>
-              <span>{{ t.desc }}</span>
-            </button>
-            <button type="button" role="radio" class="track" :aria-checked="custom" @click="form.track = 'custom'">
-              <b>自选分类</b>
-              <span>从题库里挑几个分类</span>
+              {{ d.label }}
             </button>
           </div>
         </div>
-
-        <div v-if="custom" class="field">
-          <p class="label">选择分类 <span class="muted">（已选 {{ form.categoryIds.length }} 个）</span></p>
-          <div v-for="p in outline" :key="p.id" class="cat-group">
-            <span class="cat-part">{{ p.title }}</span>
-            <div class="chips">
-              <button
-                v-for="c in p.categories"
-                :key="c.id"
-                type="button"
-                class="cat-chip"
-                :aria-pressed="form.categoryIds.includes(c.id)"
-                @click="toggleCategory(c.id)"
-              >
-                {{ c.title }}
-              </button>
-            </div>
+        <div class="field">
+          <p class="label">题数</p>
+          <div class="segmented" role="radiogroup" aria-label="题数">
+            <button v-for="n in MOCK_COUNTS" :key="n" type="button" role="radio" :aria-checked="form.count === n" @click="form.count = n">
+              {{ n }} 题
+            </button>
           </div>
         </div>
+        <div class="field">
+          <p class="label">每题追问</p>
+          <div class="segmented" role="radiogroup" aria-label="每题追问">
+            <button
+              v-for="f in FOLLOW_UPS"
+              :key="f.value"
+              type="button"
+              role="radio"
+              :aria-checked="form.followUps === f.value"
+              @click="form.followUps = f.value"
+            >
+              {{ f.label }}
+            </button>
+          </div>
+        </div>
+      </div>
 
+      <button type="button" role="switch" class="switch" :aria-checked="form.preferWeak" @click="form.preferWeak = !form.preferWeak">
+        <span class="switch-track" />优先抽不会、模糊和今天该复习的题
+      </button>
+      </template>
+
+      <template v-else-if="mode === 'agent'">
+        <div class="field">
+          <p class="label">面试目标</p>
+          <textarea
+            v-model="agentForm.goal"
+            class="resume-input"
+            aria-label="面试目标"
+            rows="3"
+            maxlength="500"
+            placeholder="例如：下周面字节跳动前端二面，React 和性能优化是重点，算法一般"
+          />
+        </div>
         <div class="row">
           <div class="field">
-            <p class="label">难度</p>
-            <div class="segmented" role="radiogroup" aria-label="难度">
-              <button
-                v-for="d in MOCK_DIFFICULTIES"
-                :key="d.value"
-                type="button"
-                role="radio"
-                :aria-checked="form.difficulty === d.value"
-                :title="d.desc"
-                @click="form.difficulty = d.value"
-              >
-                {{ d.label }}
-              </button>
+            <p class="label">主问题数量</p>
+            <div class="segmented" role="radiogroup" aria-label="主问题数量">
+              <button v-for="n in [3, 5, 8]" :key="n" type="button" role="radio" :aria-checked="agentForm.maxQuestions === n" @click="agentForm.maxQuestions = n">{{ n }} 道</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint">
+          面试官是一个会调用工具的 AI Agent：先看你的学习记录和薄弱点，再按目标从题库里找题；每次回答后自己查参考答案打分，决定追问还是换题，答得好就加难度，答不上来就换个更基础的。主问题的得分会写进复习计划。
+        </p>
+      </template>
+
+      <template v-else>
+        <div class="field">
+          <p class="label">简历或项目经历</p>
+          <textarea
+            v-model="resumeForm.resume"
+            class="resume-input"
+            rows="10"
+            maxlength="8000"
+            placeholder="粘贴简历里的项目经历部分即可：做过什么项目、负责哪块、用了哪些技术、解决了什么问题、取得了什么结果……"
+          />
+          <p class="hint">
+            {{ resumeForm.resume.length }}/8000 · 简历只用于这一次出题，不会保存到服务器，但会发给 AI 服务商处理。建议先删掉姓名、电话、邮箱、公司名等个人信息。
+          </p>
+        </div>
+        <div class="row">
+          <div class="field grow">
+            <p class="label">目标岗位 <span class="muted">（可选）</span></p>
+            <input v-model="resumeForm.role" class="text-input" maxlength="60" placeholder="例如：高级前端工程师、Go 后端" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <p class="label">项目深挖题</p>
+            <div class="segmented" role="radiogroup" aria-label="项目深挖题数量">
+              <button v-for="n in [3, 4, 6]" :key="n" type="button" role="radio" :aria-checked="resumeForm.projectCount === n" @click="resumeForm.projectCount = n">{{ n }} 道</button>
             </div>
           </div>
           <div class="field">
-            <p class="label">题数</p>
-            <div class="segmented" role="radiogroup" aria-label="题数">
-              <button v-for="n in MOCK_COUNTS" :key="n" type="button" role="radio" :aria-checked="form.count === n" @click="form.count = n">
-                {{ n }} 题
-              </button>
+            <p class="label">相关基础题</p>
+            <div class="segmented" role="radiogroup" aria-label="相关基础题数量">
+              <button v-for="n in [0, 3, 5]" :key="n" type="button" role="radio" :aria-checked="resumeForm.bankCount === n" @click="resumeForm.bankCount = n">{{ n ? `${n} 道` : '不要' }}</button>
             </div>
           </div>
           <div class="field">
             <p class="label">每题追问</p>
             <div class="segmented" role="radiogroup" aria-label="每题追问">
-              <button
-                v-for="f in FOLLOW_UPS"
-                :key="f.value"
-                type="button"
-                role="radio"
-                :aria-checked="form.followUps === f.value"
-                @click="form.followUps = f.value"
-              >
-                {{ f.label }}
-              </button>
+              <button v-for="f in FOLLOW_UPS" :key="f.value" type="button" role="radio" :aria-checked="resumeForm.followUps === f.value" @click="resumeForm.followUps = f.value">{{ f.label }}</button>
             </div>
           </div>
         </div>
+        <p class="hint">AI 先读简历，针对你的项目出题（先介绍项目，再深挖方案、难点和取舍）；同时识别简历里的技术栈，从题库对应分类补几道基础题。</p>
+      </template>
 
-        <button type="button" role="switch" class="switch" :aria-checked="form.preferWeak" @click="form.preferWeak = !form.preferWeak">
-          <span class="switch-track" />优先抽不会、模糊和今天该复习的题
+      <InterviewAiSettings v-if="showSettings" class="settings" :extra-hosts="ai?.extraHosts ?? []" @close="showSettings = false" @saved="showSettings = false" />
+
+      <div v-if="!loggedIn" class="start">
+        <p class="cost">
+          注册后就能开始<template v-if="ai?.enabled">，每天有 <b>{{ ai.dailyLimit }}</b> 次免费 AI 次数</template>。面试记录、得分和复习计划都保存在账号里，手机和电脑同步。
+        </p>
+        <SignupPrompt ai label="免费注册，开始面试" redirect="/mock" @go="saveDraft" />
+      </div>
+      <div v-else class="start">
+        <p class="cost">
+          <template v-if="mode === 'agent'">预计约 <b>{{ estimate }}</b> 次 AI 次数（每回答一次算 1 次，追问另算）。</template>
+          <template v-else>预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ perQuestion }} 次，加 1 次总结<template v-if="mode === 'resume'">和 1 次出题</template>）。</template>
+          <template v-if="hasKey">使用你自己的 Key（{{ aiKey?.model }}），不限次数。</template>
+          <template v-else-if="ai?.enabled && ai.blocked">管理员关闭了你使用站点 AI 的权限<template v-if="allowOwnKey">，可以用自己的 API Key</template>。</template>
+          <template v-else-if="ai?.enabled">今天还剩 {{ ai.remaining }} 次，不够时可以中途停下，下次接着答。</template>
+          <template v-else>站点没有配置 AI 服务，需要填写你自己的 API Key。</template>
+          <button v-if="allowOwnKey" type="button" class="link-btn" @click="showSettings = !showSettings">{{ hasKey ? 'AI 设置' : '用自己的 Key' }}</button>
+        </p>
+        <button
+          type="button"
+          class="btn btn-ai btn-lg"
+          :disabled="starting || !canUse"
+          @click="mode === 'bank' ? start() : mode === 'resume' ? startResume() : startAgent()"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" /></svg>
+          <template v-if="mode === 'bank'">{{ starting ? '正在抽题…' : '开始面试' }}</template>
+          <template v-else-if="mode === 'agent'">{{ starting ? '正在准备…' : '开始 Agent 面试' }}</template>
+          <template v-else>{{ starting ? 'AI 正在读简历、出题…' : 'AI 出题并开始' }}</template>
         </button>
-        </template>
+      </div>
+      <p v-if="errorMsg" class="error" role="alert">{{ errorMsg }}</p>
+    </section>
 
-        <template v-else-if="mode === 'agent'">
-          <div class="field">
-            <p class="label">面试目标</p>
-            <textarea
-              v-model="agentForm.goal"
-              class="resume-input"
-              aria-label="面试目标"
-              rows="3"
-              maxlength="500"
-              placeholder="例如：下周面字节跳动前端二面，React 和性能优化是重点，算法一般"
-            />
-          </div>
-          <div class="row">
-            <div class="field">
-              <p class="label">主问题数量</p>
-              <div class="segmented" role="radiogroup" aria-label="主问题数量">
-                <button v-for="n in [3, 5, 8]" :key="n" type="button" role="radio" :aria-checked="agentForm.maxQuestions === n" @click="agentForm.maxQuestions = n">{{ n }} 道</button>
-              </div>
-            </div>
-          </div>
-          <p class="hint">
-            面试官是一个会调用工具的 AI Agent：先看你的学习记录和薄弱点，再按目标从题库里找题；每次回答后自己查参考答案打分，决定追问还是换题，答得好就加难度，答不上来就换个更基础的。主问题的得分会写进复习计划。
-          </p>
-        </template>
-
-        <template v-else>
-          <div class="field">
-            <p class="label">简历或项目经历</p>
-            <textarea
-              v-model="resumeForm.resume"
-              class="resume-input"
-              rows="10"
-              maxlength="8000"
-              placeholder="粘贴简历里的项目经历部分即可：做过什么项目、负责哪块、用了哪些技术、解决了什么问题、取得了什么结果……"
-            />
-            <p class="hint">
-              {{ resumeForm.resume.length }}/8000 · 简历只用于这一次出题，不会保存到服务器，但会发给 AI 服务商处理。建议先删掉姓名、电话、邮箱、公司名等个人信息。
-            </p>
-          </div>
-          <div class="row">
-            <div class="field grow">
-              <p class="label">目标岗位 <span class="muted">（可选）</span></p>
-              <input v-model="resumeForm.role" class="text-input" maxlength="60" placeholder="例如：高级前端工程师、Go 后端" />
-            </div>
-          </div>
-          <div class="row">
-            <div class="field">
-              <p class="label">项目深挖题</p>
-              <div class="segmented" role="radiogroup" aria-label="项目深挖题数量">
-                <button v-for="n in [3, 4, 6]" :key="n" type="button" role="radio" :aria-checked="resumeForm.projectCount === n" @click="resumeForm.projectCount = n">{{ n }} 道</button>
-              </div>
-            </div>
-            <div class="field">
-              <p class="label">相关基础题</p>
-              <div class="segmented" role="radiogroup" aria-label="相关基础题数量">
-                <button v-for="n in [0, 3, 5]" :key="n" type="button" role="radio" :aria-checked="resumeForm.bankCount === n" @click="resumeForm.bankCount = n">{{ n ? `${n} 道` : '不要' }}</button>
-              </div>
-            </div>
-            <div class="field">
-              <p class="label">每题追问</p>
-              <div class="segmented" role="radiogroup" aria-label="每题追问">
-                <button v-for="f in FOLLOW_UPS" :key="f.value" type="button" role="radio" :aria-checked="resumeForm.followUps === f.value" @click="resumeForm.followUps = f.value">{{ f.label }}</button>
-              </div>
-            </div>
-          </div>
-          <p class="hint">AI 先读简历，针对你的项目出题（先介绍项目，再深挖方案、难点和取舍）；同时识别简历里的技术栈，从题库对应分类补几道基础题。</p>
-        </template>
-
-        <InterviewAiSettings v-if="showSettings" class="settings" :extra-hosts="ai?.extraHosts ?? []" @close="showSettings = false" @saved="showSettings = false" />
-
-        <div class="start">
-          <p class="cost">
-            <template v-if="mode === 'agent'">预计约 <b>{{ estimate }}</b> 次 AI 次数（每回答一次算 1 次，追问另算）。</template>
-            <template v-else>预计调用大模型约 <b>{{ estimate }}</b> 次（每题 {{ perQuestion }} 次，加 1 次总结<template v-if="mode === 'resume'">和 1 次出题</template>）。</template>
-            <template v-if="hasKey">使用你自己的 Key（{{ aiKey?.model }}），不限次数。</template>
-            <template v-else-if="ai?.enabled && ai.blocked">管理员关闭了你使用站点 AI 的权限<template v-if="allowOwnKey">，可以用自己的 API Key</template>。</template>
-            <template v-else-if="ai?.enabled">今天还剩 {{ ai.remaining }} 次，不够时可以中途停下，下次接着答。</template>
-            <template v-else>站点没有配置 AI 服务，需要填写你自己的 API Key。</template>
-            <button v-if="allowOwnKey" type="button" class="link-btn" @click="showSettings = !showSettings">{{ hasKey ? 'AI 设置' : '用自己的 Key' }}</button>
-          </p>
-          <button
-            type="button"
-            class="btn btn-ai btn-lg"
-            :disabled="starting || !canUse"
-            @click="mode === 'bank' ? start() : mode === 'resume' ? startResume() : startAgent()"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" /></svg>
-            <template v-if="mode === 'bank'">{{ starting ? '正在抽题…' : '开始面试' }}</template>
-            <template v-else-if="mode === 'agent'">{{ starting ? '正在准备…' : '开始 Agent 面试' }}</template>
-            <template v-else>{{ starting ? 'AI 正在读简历、出题…' : 'AI 出题并开始' }}</template>
+    <section v-if="mode === 'agent' && agentHistory.length" class="history">
+      <h2 class="serif">Agent 面试记录</h2>
+      <ul>
+        <li v-for="s in agentHistory" :key="s.id" class="history-row">
+          <NuxtLink :to="`/mock/agent/${s.id}`" class="history-main">
+            <span class="history-title">{{ s.goal }}</span>
+            <span class="history-meta">
+              {{ formatTime(s.createdAt) }} · 问了 {{ s.asked }} / {{ s.maxQuestions }} 题{{ s.status === 'active' ? ' · 进行中' : '' }}
+            </span>
+          </NuxtLink>
+          <span class="history-score" :class="scoreLevel(s.score)">{{ s.score ?? '—' }}<small v-if="s.score !== null"> 分</small></span>
+          <button type="button" class="icon-btn" aria-label="删除这场面试" @click="removeAgent(s)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
           </button>
-        </div>
-        <p v-if="errorMsg" class="error" role="alert">{{ errorMsg }}</p>
-      </section>
+        </li>
+      </ul>
+    </section>
 
-      <section v-if="mode === 'agent' && agentHistory.length" class="history">
-        <h2 class="serif">Agent 面试记录</h2>
-        <ul>
-          <li v-for="s in agentHistory" :key="s.id" class="history-row">
-            <NuxtLink :to="`/mock/agent/${s.id}`" class="history-main">
-              <span class="history-title">{{ s.goal }}</span>
-              <span class="history-meta">
-                {{ formatTime(s.createdAt) }} · 问了 {{ s.asked }} / {{ s.maxQuestions }} 题{{ s.status === 'active' ? ' · 进行中' : '' }}
-              </span>
-            </NuxtLink>
-            <span class="history-score" :class="scoreLevel(s.score)">{{ s.score ?? '—' }}<small v-if="s.score !== null"> 分</small></span>
-            <button type="button" class="icon-btn" aria-label="删除这场面试" @click="removeAgent(s)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
-            </button>
-          </li>
-        </ul>
-      </section>
-
-      <section v-if="finishedList.length && mode !== 'agent'" class="history">
-        <h2 class="serif">面试记录</h2>
-        <ul>
-          <li v-for="s in finishedList" :key="s.id" class="history-row">
-            <NuxtLink :to="`/mock/${s.id}`" class="history-main">
-              <span class="history-title">{{ s.title }}</span>
-              <span class="history-meta">{{ formatTime(s.createdAt) }} · 答了 {{ s.answered }} / {{ s.count }} 题</span>
-            </NuxtLink>
-            <span class="history-score" :class="scoreLevel(s.score)">{{ s.score ?? '—' }}<small v-if="s.score !== null"> 分</small></span>
-            <button type="button" class="icon-btn" aria-label="删除这场面试" @click="remove(s)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
-            </button>
-          </li>
-        </ul>
-      </section>
-    </template>
+    <section v-if="finishedList.length && mode !== 'agent'" class="history">
+      <h2 class="serif">面试记录</h2>
+      <ul>
+        <li v-for="s in finishedList" :key="s.id" class="history-row">
+          <NuxtLink :to="`/mock/${s.id}`" class="history-main">
+            <span class="history-title">{{ s.title }}</span>
+            <span class="history-meta">{{ formatTime(s.createdAt) }} · 答了 {{ s.answered }} / {{ s.count }} 题</span>
+          </NuxtLink>
+          <span class="history-score" :class="scoreLevel(s.score)">{{ s.score ?? '—' }}<small v-if="s.score !== null"> 分</small></span>
+          <button type="button" class="icon-btn" aria-label="删除这场面试" @click="remove(s)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+          </button>
+        </li>
+      </ul>
+    </section>
   </div>
 </template>
 
@@ -435,21 +460,6 @@ const scoreLevel = (s: number | null) => (s === null ? '' : s >= 8 ? 'good' : s 
 .sub {
   max-width: 640px;
   margin: 10px 0 0;
-  color: var(--c-text-2);
-}
-
-.notice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 32px;
-  padding: 20px 24px;
-}
-
-.notice p {
-  margin: 0;
   color: var(--c-text-2);
 }
 

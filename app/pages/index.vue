@@ -36,6 +36,52 @@ const backCards = computed(() =>
     .filter((q) => !!q),
 )
 
+/** "不止刷题"：每个功能一句话说清楚，点进去就是入口。icon 是 24×24 线框图标的路径 */
+const features = [
+  {
+    title: '问手册',
+    ai: true,
+    text: '用自己的话提问，AI 只依据手册内容回答，每句话标出处，点编号直达原题。',
+    to: '/ask',
+    icon: ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z', 'M9.6 9.4a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5', 'M12 16.5h.01'],
+  },
+  {
+    title: '整场模拟面试',
+    ai: true,
+    text: '按方向和难度连续出题、追问，结束后给出各题得分、分类得分和复习建议。',
+    to: '/mock',
+    icon: ['M8 3.5h8v3H8z', 'M8 5H6.5a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16', 'M9 11h6M9 14.5h6M9 18h3'],
+  },
+  {
+    title: '按简历出题',
+    ai: true,
+    text: '贴上项目经历，AI 针对你的项目深挖方案、难点和取舍，再补几道相关基础题。',
+    to: '/mock?mode=resume',
+    icon: ['M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z', 'M14 3v5h5', 'M9 13h6M9 17h4'],
+  },
+  {
+    title: 'Agent 面试官',
+    ai: true,
+    text: '会调用工具的面试官：先看你的薄弱点，再自己找题、打分，决定追问还是换题。',
+    to: '/mock?mode=agent',
+    icon: ['M8 8h8a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z', 'M12 4v4', 'M9.5 13h.01M14.5 13h.01', 'M2 13v2M22 13v2'],
+  },
+  {
+    title: '间隔复习与周报',
+    ai: false,
+    text: '按遗忘曲线安排复习，低分题自动进计划；每周一份学习报告，看清薄弱分类。',
+    to: '/review',
+    icon: ['M3 12a9 9 0 1 0 2.6-6.4L3 8', 'M3 3v5h5', 'M12 7v5l3 2'],
+  },
+  {
+    title: '接入 AI 工具',
+    ai: false,
+    text: '通过 MCP 在 Claude Code、Cursor 里检索手册，让 AI 按你的薄弱点出题考你。',
+    to: '/connect',
+    icon: ['M9 2v5M15 2v5', 'M6 7h12v4a6 6 0 0 1-12 0z', 'M12 17v5'],
+  },
+]
+
 const steps = [
   { title: '先想再看', text: '打开自测模式，答案先藏起来，逼自己先回忆、先组织语言。' },
   { title: '让 AI 考你', text: '用自己的话作答，AI 对照参考答案打分，再顺着你的回答追问。' },
@@ -201,6 +247,27 @@ const steps = [
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- 功能 -->
+    <section class="container features">
+      <header class="section-head">
+        <p class="eyebrow">FEATURES · 功能</p>
+        <h2 class="serif">不止刷题</h2>
+        <p class="muted">从读懂一道题，到撑过一整场面试。</p>
+      </header>
+      <ul class="feature-grid">
+        <li v-for="f in features" :key="f.title">
+          <NuxtLink :to="f.to" class="feature">
+            <span class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path v-for="d in f.icon" :key="d" :d="d" /></svg>
+            </span>
+            <h3>{{ f.title }}<span v-if="f.ai" class="feature-tag ai-text">AI</span></h3>
+            <p>{{ f.text }}</p>
+            <span class="feature-go">去看看 →</span>
+          </NuxtLink>
+        </li>
+      </ul>
     </section>
 
     <!-- 方法 -->
@@ -1009,6 +1076,85 @@ html.dark .ai-band {
   }
 }
 
+/* ---------- 功能 ---------- */
+.features {
+  margin-top: 112px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 36px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-elv);
+  color: var(--c-text-1);
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.feature:hover {
+  border-color: var(--c-border);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  background: var(--c-brand-soft);
+  color: var(--c-brand);
+}
+
+.feature h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 18px;
+}
+
+.feature-tag {
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--ai-via) 30%, transparent);
+  border-radius: var(--r-full);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 18px;
+}
+
+.feature p {
+  flex: 1;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--c-text-2);
+}
+
+.feature-go {
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-brand);
+}
+
 /* ---------- 用法 ---------- */
 .method {
   margin-top: 112px;
@@ -1095,7 +1241,8 @@ html.dark .ai-band {
     width: 100%;
   }
 
-  .steps {
+  .steps,
+  .feature-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -1191,8 +1338,13 @@ html.dark .ai-band {
     padding: 64px 0;
   }
 
-  .steps {
+  .steps,
+  .feature-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .features {
+    margin-top: 80px;
   }
 
   .closing {

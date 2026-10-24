@@ -207,12 +207,14 @@ const formatTime = (iso: string) =>
       </div>
     </header>
 
-    <div v-if="!loggedIn" class="notice">
-      <span class="notice-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-      </span>
-      <span class="notice-text">登录后就可以和 AI 面试官对练，面试记录也会保存下来。</span>
-      <NuxtLink :to="`/login?redirect=${encodeURIComponent(route.fullPath)}`" class="btn btn-sm btn-primary">登录</NuxtLink>
+    <!-- 没登录：先说清楚 AI 面试官会做什么，再请人注册；注册后回到这个面板 -->
+    <div v-if="!loggedIn" class="teaser">
+      <ol class="teaser-steps">
+        <li><b>作答</b><span>用自己的话把这道题讲一遍，可以打字也可以说</span></li>
+        <li><b>点评</b><span>对照参考答案打 0～10 分，答对的点、遗漏和错误逐条列出</span></li>
+        <li><b>追问</b><span>顺着你的回答继续问，最多 3 轮；低分题自动加入复习</span></li>
+      </ol>
+      <SignupPrompt ai label="免费注册，让 AI 考我" :redirect="`${route.path}#interview`" />
     </div>
 
     <InterviewAiSettings
@@ -504,6 +506,45 @@ h2 {
   background: var(--c-bg-elv);
   font-size: 14px;
   color: var(--c-text-2);
+}
+
+.teaser {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--c-divider);
+  border-radius: var(--r-md);
+  background: var(--c-bg-elv);
+}
+
+.teaser-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  font-size: 14px;
+}
+
+.teaser-steps li {
+  display: grid;
+  grid-template-columns: 22px 44px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--c-text-2);
+  counter-increment: step;
+}
+
+.teaser-steps li::before {
+  content: counter(step, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ai-text);
+}
+
+.teaser-steps b {
+  color: var(--c-text-1);
 }
 
 .notice-icon {
