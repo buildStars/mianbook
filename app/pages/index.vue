@@ -1,7 +1,22 @@
 <script setup lang="ts">
-const siteName = useRuntimeConfig().public.siteName
+const site = useRuntimeConfig().public
+const siteName = site.siteName
 // 首页标题自己写全，不套"| 站名"
 useHead({ title: `${siteName} · 把面试题讲成自己的话`, titleTemplate: null })
+
+// 结构化数据：WebSite 让搜索结果显示正确的站名，Organization 提供站点标志
+useJsonLd([
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: siteName,
+    alternateName: ['mianbook'],
+    url: `${site.siteUrl}/`,
+    inLanguage: 'zh-CN',
+    description: '前端、后端、AI 应用高频面试题详解，一句话回答、追问和易错点，读完再让 AI 面试官考你一遍',
+  },
+  { '@context': 'https://schema.org', ...siteOrganization(site) },
+])
 
 const { outline, all, firstPathOf } = useOutline()
 const { records } = useStudy()

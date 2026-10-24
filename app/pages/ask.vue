@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AskDoneEvent, AskSourceView, AskSourcesEvent } from '#shared/types/ask'
 
-useHead({ title: '问手册' })
+const seoTitle = '问手册：AI 根据题库回答面试问题'
+const seoDescription = '用自己的话问面试问题：先从面书题库里找出相关段落，再由 AI 根据这些段落回答，每句话都标出处，点编号就能看原题。'
+useSeoMeta({ title: seoTitle, description: seoDescription, ogTitle: seoTitle, ogDescription: seoDescription })
 
 interface AiStatus {
   enabled: boolean

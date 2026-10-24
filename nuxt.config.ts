@@ -27,6 +27,10 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-title', content: '面书' },
         { name: 'theme-color', content: '#faf9f6', media: '(prefers-color-scheme: light)' },
         { name: 'theme-color', content: '#131315', media: '(prefers-color-scheme: dark)' },
+        // 百度：页面同时适配电脑和手机，移动搜索不要转码。两条 http-equiv 相同，用 key 区分，否则会被去重成一条
+        { name: 'applicable-device', content: 'pc,mobile' },
+        { 'http-equiv': 'Cache-Control', content: 'no-transform', key: 'no-transform' },
+        { 'http-equiv': 'Cache-Control', content: 'no-siteapp', key: 'no-siteapp' },
       ],
       // 标志素材在 public/，生成方法见 DESIGN.md「站点标志」
       link: [
@@ -40,6 +44,8 @@ export default defineNuxtConfig({
 
   // 个人页面、账号页面和后台不让搜索引擎收录（robots.txt 只挡接口，页面靠这个响应头）
   routeRules: {
+    // 接口返回的是数据，不收录（目录接口允许抓取，见 robots.txt）
+    '/api/**': { headers: { 'X-Robots-Tag': 'noindex' } },
     '/admin/**': { headers: { 'X-Robots-Tag': 'noindex' } },
     // 只挡具体的面试记录；/mock 本身是功能介绍页，要收录（/mock/** 会连 /mock 一起匹配）
     '/mock/*': { headers: { 'X-Robots-Tag': 'noindex' } },
@@ -135,6 +141,9 @@ export default defineNuxtConfig({
       siteName: '面书',
       // 对外的网址：canonical、分享卡片、sitemap 里的绝对地址都用它，部署到别的域名时用 NUXT_PUBLIC_SITE_URL 覆盖
       siteUrl: 'https://mianbook.ink',
+      // 搜索引擎站长平台"HTML 标签验证"的验证码（meta 标签 content 里的那串），填了才输出到页面，
+      // 例如 NUXT_PUBLIC_SITE_VERIFICATION_BAIDU=codeva-xxxx，见 .env.example
+      siteVerification: { google: '', bing: '', baidu: '' },
     },
   },
 })

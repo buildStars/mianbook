@@ -271,6 +271,8 @@ TalkCue（面试提词助手，talkcue.site）在面试中每听到一个问题�
 
 **题目以线上后台为准**：上线后在线上后台改题。服务器上没有 `content/` 目录，修改只保存在数据库里。本地新写的题要发布时，先提交再执行 `npm run deploy -- --import`。导入不会覆盖线上比文件新的题。
 
+**搜索引擎收录**：站点自带 `robots.txt`、`sitemap.xml`（首页、功能入口、分类专题页和全部题目，带最后修改时间）、canonical、分享卡片和结构化数据（首页的站点信息、分类专题页的题目列表、题目页的面包屑和文章信息）；结尾带斜杠的地址会 301 到不带斜杠的版本。上线后到 [Google Search Console](https://search.google.com/search-console)、[必应站长工具](https://www.bing.com/webmasters)、[百度搜索资源平台](https://ziyuan.baidu.com) 添加站点并提交 `https://你的域名/sitemap.xml`。验证网站时选"HTML 标签"，把 meta 标签 content 里的那串值填进服务器 `.env` 的 `NUXT_PUBLIC_SITE_VERIFICATION_GOOGLE`、`NUXT_PUBLIC_SITE_VERIFICATION_BING`、`NUXT_PUBLIC_SITE_VERIFICATION_BAIDU`，执行 `docker compose up -d app` 重启后再点验证。
+
 **备份**：服务器每天 03:30 自动备份数据库到 `/opt/handbook/backups`，保留 14 天。`npm run deploy:backup` 会立即备份一次，并下载到本地的 `backups/` 目录。
 
 **CI/CD（GitHub Actions）**：

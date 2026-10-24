@@ -34,27 +34,24 @@ useSeoMeta({
   ogDescription: description,
 })
 
-// 结构化数据：面包屑和题目列表，帮助搜索引擎理解这是一个题目合集。< 转义掉，避免题目里的字符提前结束 <script>
-const jsonLd = computed(() =>
-  JSON.stringify([
-    {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: siteName, item: `${siteUrl}/` },
-        { '@type': 'ListItem', position: 2, name: heading.value, item: `${siteUrl}/${key.value}` },
-      ],
-    },
-    {
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
-      name: heading.value,
-      numberOfItems: total.value,
-      itemListElement: d.value.questions.map((q, i) => ({ '@type': 'ListItem', position: i + 1, url: siteUrl + q.path, name: plainTitle(q.title) })),
-    },
-  ]).replace(/</g, '\\u003c'),
-)
-useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
+// 结构化数据：面包屑和题目列表，帮助搜索引擎理解这是一个题目合集
+useJsonLd(() => [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: siteName, item: `${siteUrl}/` },
+      { '@type': 'ListItem', position: 2, name: heading.value, item: `${siteUrl}/${key.value}` },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: heading.value,
+    numberOfItems: total.value,
+    itemListElement: d.value.questions.map((q, i) => ({ '@type': 'ListItem', position: i + 1, url: siteUrl + q.path, name: plainTitle(q.title) })),
+  },
+])
 
 // 难度筛选：0 是全部
 const level = ref(0)

@@ -1,12 +1,18 @@
 <script setup lang="ts">
 const route = useRoute()
-const { siteName, siteUrl } = useRuntimeConfig().public
+const { siteName, siteUrl, siteVerification } = useRuntimeConfig().public
 const pageUrl = computed(() => `${siteUrl}${route.path}`)
 
-// 页面只写自己的标题，站名统一在这里拼上；没有标题时只显示站名
+// 页面只写自己的标题，站名统一在这里拼上；没有标题时只显示站名。
+// 站长平台的验证标签配置了才输出（nuxt.config.ts 的 siteVerification）
 useHead({
   titleTemplate: (title) => (title ? `${title} | ${siteName}` : siteName),
   link: [{ rel: 'canonical', href: pageUrl }],
+  meta: [
+    { name: 'google-site-verification', content: siteVerification.google },
+    { name: 'msvalidate.01', content: siteVerification.bing },
+    { name: 'baidu-site-verification', content: siteVerification.baidu },
+  ].filter((m) => m.content),
 })
 
 // 分享卡片的默认值：题目页会换成自己的标题和描述

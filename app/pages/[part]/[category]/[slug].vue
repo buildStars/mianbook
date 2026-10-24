@@ -28,6 +28,44 @@ useSeoMeta({
   articleSection: () => question.value?.category.title,
 })
 
+// 结构化数据：面包屑（首页 → 分类专题页 → 本题）和技术文章，搜索结果里能显示层级
+const site = useRuntimeConfig().public
+const { siteUrl } = site
+useJsonLd(() => {
+  const q = question.value
+  if (!q) return null
+  const url = siteUrl + q.path
+  const categoryUrl = `${siteUrl}/${q.part.slug}/${q.category.slug}`
+  const headline = plainTitle(q.title)
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: site.siteName, item: `${siteUrl}/` },
+        { '@type': 'ListItem', position: 2, name: categoryHeading(q.category.title), item: categoryUrl },
+        { '@type': 'ListItem', position: 3, name: headline, item: url },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'TechArticle',
+      headline,
+      description: q.summary,
+      url,
+      mainEntityOfPage: url,
+      inLanguage: 'zh-CN',
+      dateModified: q.updatedAt,
+      articleSection: q.category.title,
+      keywords: [q.category.title, '面试题', ...q.tags].join(','),
+      image: `${siteUrl}/og.png`,
+      isAccessibleForFree: true,
+      author: siteOrganization(site),
+      publisher: siteOrganization(site),
+    },
+  ]
+})
+
 const quiz = useQuizMode()
 const revealed = ref(false)
 watch(path, () => (revealed.value = false))

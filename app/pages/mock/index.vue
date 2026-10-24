@@ -2,7 +2,9 @@
 import type { AgentSessionSummary } from '#shared/types/agent'
 import type { MockDifficulty, MockSessionSummary } from '#shared/types/handbook'
 
-useHead({ title: '模拟面试' })
+const seoTitle = 'AI 模拟面试'
+const seoDescription = '选一个方向，AI 面试官像真实面试一样连续提问：每道题打分、追问，结束后给出总结和复习建议，低分的题自动加入复习计划。'
+useSeoMeta({ title: seoTitle, description: seoDescription, ogTitle: seoTitle, ogDescription: seoDescription })
 
 interface AiStatus {
   enabled: boolean

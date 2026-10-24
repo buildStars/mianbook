@@ -122,6 +122,8 @@ export default async function setup(project: TestProject) {
       // 测试请求都来自本机：用 X-Forwarded-For 给每次注册分配不同的 IP，按 IP 限流的逻辑也能测
       NUXT_AUTH_TRUST_PROXY: 'true',
       NUXT_AUTH_CODE_DAILY_TOTAL: '100000',
+      // 只配谷歌的站长验证码，测"配置了才输出"
+      NUXT_PUBLIC_SITE_VERIFICATION_GOOGLE: 'test-google-verification',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

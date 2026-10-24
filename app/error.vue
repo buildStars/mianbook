@@ -8,6 +8,9 @@ const title = computed(() => {
   if (props.error.statusCode === 403) return '没有权限访问'
   return '出了点问题'
 })
+// 出错时渲染的是这个页面而不是 app.vue，站名模板不生效，标题自己拼上站名
+const { siteName } = useRuntimeConfig().public
+useHead({ title: () => `${title.value} | ${siteName}` })
 
 const searchOpen = useState('search-open', () => false)
 </script>
