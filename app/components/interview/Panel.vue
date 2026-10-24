@@ -288,6 +288,7 @@ const formatTime = (iso: string) =>
             <textarea
               ref="textarea"
               v-model="answer"
+              aria-label="你的回答"
               rows="5"
               maxlength="3000"
               placeholder="像面试时一样，用自己的话回答……"

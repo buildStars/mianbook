@@ -189,7 +189,7 @@ async function suggest() {
     <section class="block">
       <h3>起草正文</h3>
       <p class="desc">按写作规范、参考同分类的一道题，写一篇完整正文，直接写进编辑器。</p>
-      <ElInput v-model="notes" type="textarea" :rows="3" resize="none" maxlength="2000" placeholder="可选：希望覆盖的要点、想强调的对比……" />
+      <ElInput v-model="notes" aria-label="起草时希望覆盖的要点" type="textarea" :rows="3" resize="none" maxlength="2000" placeholder="可选：希望覆盖的要点、想强调的对比……" />
       <div class="row">
         <button v-if="busy === 'draft'" type="button" class="btn btn-sm" @click="stop">
           <AdminIcon name="close" :size="15" />停止
@@ -216,7 +216,7 @@ async function suggest() {
       </p>
       <template v-else>
         <p class="desc">写下要怎么改，例如"补充 Vue 3 和 Vue 2 的区别"、"代码示例改成 TypeScript"。</p>
-        <ElInput v-model="instruction" type="textarea" :rows="3" resize="none" maxlength="2000" placeholder="修改要求" />
+        <ElInput v-model="instruction" aria-label="修改要求" type="textarea" :rows="3" resize="none" maxlength="2000" placeholder="修改要求" />
       </template>
       <div class="row">
         <button type="button" class="btn btn-sm" :disabled="!canRevise || !!busy" @click="revise">
@@ -230,7 +230,7 @@ async function suggest() {
     <section class="block">
       <h3>选题建议</h3>
       <p class="desc">{{ categoryId ? `看看"${categoryTitle}"还缺哪些高频题。` : '先在"属性"里选分类。' }}</p>
-      <ElInput v-model="hint" maxlength="500" placeholder="可选：想补充的方向，例如性能优化、工程实践" />
+      <ElInput v-model="hint" aria-label="推荐题目时想补充的方向" maxlength="500" placeholder="可选：想补充的方向，例如性能优化、工程实践" />
       <div class="row">
         <button type="button" class="btn btn-sm" :disabled="!categoryId || !!busy" @click="suggest">
           <AdminIcon name="sparkle" :size="15" />{{ busy === 'topics' ? '思考中…' : '推荐题目' }}

@@ -191,7 +191,7 @@ const categoryLink = computed(() => {
 }
 
 .star-btn.on svg {
-  color: var(--st-fuzzy);
+  color: var(--st-star);
 }
 
 @media (max-width: 640px) {

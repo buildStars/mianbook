@@ -145,18 +145,18 @@ async function remove(kind: Kind, id: number, title: string) {
     <ElDialog v-model="dialog.open" :title="`${dialog.id ? '编辑' : '新建'}${dialog.kind === 'part' ? '部分' : '分类'}`" width="440px" append-to-body>
       <ElForm label-position="top" @submit.prevent="save">
         <ElFormItem v-if="dialog.kind === 'category'" label="所属部分">
-          <ElSelect v-model="dialog.form.partId" style="width: 100%">
+          <ElSelect v-model="dialog.form.partId" aria-label="所属部分" style="width: 100%">
             <ElOption v-for="p in structure" :key="p.id" :label="p.title" :value="p.id" />
           </ElSelect>
         </ElFormItem>
         <ElFormItem label="名称">
-          <ElInput v-model="dialog.form.title" maxlength="64" />
+          <ElInput v-model="dialog.form.title" aria-label="名称" maxlength="64" />
         </ElFormItem>
         <ElFormItem label="slug（出现在网址里）">
-          <ElInput v-model="dialog.form.slug" placeholder="小写字母、数字和连字符" spellcheck="false" />
+          <ElInput v-model="dialog.form.slug" aria-label="slug" placeholder="小写字母、数字和连字符" spellcheck="false" />
         </ElFormItem>
         <ElFormItem label="排序（越小越靠前）">
-          <ElInputNumber v-model="dialog.form.sort" :min="0" controls-position="right" />
+          <ElInputNumber v-model="dialog.form.sort" aria-label="排序" :min="0" controls-position="right" />
         </ElFormItem>
       </ElForm>
       <template #footer>

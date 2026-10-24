@@ -101,23 +101,24 @@ async function submit() {
           {{ mode === 'login' ? '登录后学习记录会同步到账号，还可以使用 AI 模拟面试。' : '注册后学习记录保存在服务器上，手机和电脑自动同步。' }}
         </p>
         <ElForm label-position="top" size="large" @submit.prevent="submit">
-          <ElFormItem label="邮箱">
-            <ElInput v-model="form.email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <ElFormItem label="邮箱" for="auth-email">
+            <ElInput id="auth-email" v-model="form.email" type="email" autocomplete="email" placeholder="you@example.com" />
           </ElFormItem>
-          <ElFormItem v-if="needCode" label="邮箱验证码">
+          <ElFormItem v-if="needCode" label="邮箱验证码" for="auth-code">
             <div class="code-row">
-              <ElInput v-model="form.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" />
+              <ElInput id="auth-code" v-model="form.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" />
               <button type="button" class="btn code-btn" :disabled="sending || countdown > 0" @click="sendCode">
                 {{ countdown > 0 ? `${countdown} 秒后重发` : sending ? '发送中…' : '获取验证码' }}
               </button>
             </div>
             <p v-if="codeHint" class="code-hint">{{ codeHint }}</p>
           </ElFormItem>
-          <ElFormItem v-if="mode === 'register'" label="昵称">
-            <ElInput v-model="form.name" maxlength="32" autocomplete="nickname" placeholder="怎么称呼你" />
+          <ElFormItem v-if="mode === 'register'" label="昵称" for="auth-name">
+            <ElInput id="auth-name" v-model="form.name" maxlength="32" autocomplete="nickname" placeholder="怎么称呼你" />
           </ElFormItem>
-          <ElFormItem label="密码">
+          <ElFormItem label="密码" for="auth-password">
             <ElInput
+              id="auth-password"
               v-model="form.password"
               type="password"
               show-password

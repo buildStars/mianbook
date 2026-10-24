@@ -262,6 +262,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
               <textarea
                 ref="textarea"
                 v-model="answer"
+                aria-label="你的回答"
                 rows="5"
                 maxlength="3000"
                 placeholder="像面试时一样，用自己的话回答……"
@@ -550,7 +551,8 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
   border: 1px solid var(--c-divider);
   border-top-left-radius: 4px;
   background: var(--c-bg-soft);
-  font-weight: 600;
+  /* 用 700 而不是 600：微软雅黑没有半粗，600 时中文按粗体、英文按半粗显示，同一句话粗细不一 */
+  font-weight: 700;
 }
 
 .msg.me .bubble {

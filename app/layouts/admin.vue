@@ -344,7 +344,9 @@ nav a.active::before {
     scrollbar-width: none;
   }
 
+  /* 分组不能被横向滚动的容器压缩，否则前一组的最后一项会盖到后一组上 */
   .group {
+    flex: none;
     flex-direction: row;
   }
 

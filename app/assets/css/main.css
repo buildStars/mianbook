@@ -56,6 +56,8 @@
   --st-empty: #d9d4ca;
   --st-weak-text: #c42f2a;
   --st-fuzzy-text: #8a5d00;
+  /* 收藏的星星：图形至少 3:1，黄色本身在白底上只有 2.3:1 */
+  --st-star: #b07800;
   --st-mastered-text: #1d7a4f;
 
   /* 提示块 */
@@ -141,6 +143,7 @@ html.dark {
   --st-empty: #45454c;
   --st-weak-text: #ff8a8d;
   --st-fuzzy-text: #f2c14e;
+  --st-star: #f2c14e;
   --st-mastered-text: #52d99c;
 
   --c-default-soft: rgba(236, 235, 231, 0.07);
@@ -181,6 +184,9 @@ html.dark:root {
   --el-text-color-primary: var(--c-text-1);
   --el-text-color-regular: var(--c-text-2);
   --el-text-color-secondary: var(--c-text-3);
+  /* Element Plus 默认的占位文字和 info 色（标签、输入框前缀）在白底上只有 2.3～2.8:1，换成站点的辅助文字色 */
+  --el-text-color-placeholder: var(--c-text-3);
+  --el-color-info: var(--c-text-2);
 }
 
 html:root {
@@ -565,7 +571,7 @@ kbd,
 .dot.is-mastered { background: var(--st-mastered); }
 
 .star {
-  color: var(--st-fuzzy);
+  color: var(--st-star);
 }
 
 /* 键盘快捷键提示（Ctrl + Enter、Esc 等）只给有键盘的设备看；触屏设备换成 .touch-only 里的说法 */

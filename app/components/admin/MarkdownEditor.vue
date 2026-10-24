@@ -154,6 +154,7 @@ function syncScroll() {
     <div class="panes" :class="mode">
       <textarea
         v-show="mode !== 'preview'"
+        aria-label="题目正文（Markdown）"
         ref="textarea"
         v-model="model"
         spellcheck="false"

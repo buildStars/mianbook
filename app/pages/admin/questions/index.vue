@@ -173,12 +173,12 @@ function onMore(command: string, row: Row) {
             {{ t.label }}
           </button>
         </div>
-        <ElSelect v-model="filters.categoryId" placeholder="全部分类" clearable filterable class="cat-select">
+        <ElSelect v-model="filters.categoryId" aria-label="按分类筛选" placeholder="全部分类" clearable filterable class="cat-select">
           <ElOptionGroup v-for="part in structure" :key="part.id" :label="part.title">
             <ElOption v-for="cat in part.categories" :key="cat.id" :label="cat.title" :value="cat.id" />
           </ElOptionGroup>
         </ElSelect>
-        <ElInput v-model="filters.q" placeholder="搜索题目" clearable class="search">
+        <ElInput v-model="filters.q" aria-label="搜索题目" placeholder="搜索题目" clearable class="search">
           <template #prefix><AdminIcon name="search" :size="16" /></template>
         </ElInput>
       </div>
@@ -267,7 +267,7 @@ function onMore(command: string, row: Row) {
 
     <ElDialog v-model="moveDialog.open" title="移动到分类" width="420px" append-to-body>
       <p class="dialog-tip">选中的 {{ selected.length }} 道题会排在目标分类的最后，网址会跟着变。</p>
-      <ElSelect v-model="moveDialog.categoryId" placeholder="选择分类" filterable style="width: 100%">
+      <ElSelect v-model="moveDialog.categoryId" aria-label="目标分类" placeholder="选择分类" filterable style="width: 100%">
         <ElOptionGroup v-for="part in structure" :key="part.id" :label="part.title">
           <ElOption v-for="cat in part.categories" :key="cat.id" :label="cat.title" :value="cat.id" />
         </ElOptionGroup>

@@ -179,6 +179,11 @@ const urlPrefix = computed(() => {
   const cat = categories.value.find((c) => c.id === form.categoryId)
   return cat ? `/${cat.partSlug}/${cat.slug}/` : '/分类/'
 })
+/** 侧栏放不下完整前缀时按层级省略成"…/javascript/"，不在单词中间截断；完整前缀放在 title 里 */
+const urlPrefixShort = computed(() => {
+  const cat = categories.value.find((c) => c.id === form.categoryId)
+  return cat && urlPrefix.value.length > 16 ? `…/${cat.slug}/` : urlPrefix.value
+})
 
 // ---------- 格式检查 ----------
 const { all: outlineQuestions } = useOutline()
@@ -256,7 +261,7 @@ function restoreVersion(v: QuestionVersionDetail) {
       <NuxtLink to="/admin/questions" class="a-icon-btn" title="返回题目列表" aria-label="返回题目列表"><AdminIcon name="back" /></NuxtLink>
       <div class="ws-title">
         <p class="eyebrow">{{ isNew ? '新建题目' : `编辑题目 · #${questionId}` }}</p>
-        <p class="ws-name serif">{{ plainTitle(form.title) || '未命名题目' }}</p>
+        <h1 class="ws-name serif">{{ plainTitle(form.title) || '未命名题目' }}</h1>
       </div>
       <span class="save-state" :class="saveState.kind" role="status">
         <i aria-hidden="true" />{{ saveState.text }}
@@ -310,15 +315,15 @@ function restoreVersion(v: QuestionVersionDetail) {
         <div v-show="panel === 'props'" class="pane" role="tabpanel">
           <ElForm label-position="top" @submit.prevent="save">
             <ElFormItem label="分类">
-              <ElSelect v-model="form.categoryId" placeholder="选择分类" filterable>
+              <ElSelect v-model="form.categoryId" aria-label="分类" placeholder="选择分类" filterable>
                 <ElOptionGroup v-for="part in structure" :key="part.id" :label="part.title">
                   <ElOption v-for="cat in part.categories" :key="cat.id" :label="cat.title" :value="cat.id" />
                 </ElOptionGroup>
               </ElSelect>
             </ElFormItem>
             <ElFormItem label="网址">
-              <ElInput v-model="form.slug" placeholder="closure" spellcheck="false">
-                <template #prepend><span class="url-prefix" :title="urlPrefix">{{ urlPrefix }}</span></template>
+              <ElInput v-model="form.slug" aria-label="网址" placeholder="closure" spellcheck="false">
+                <template #prepend><span class="url-prefix" :title="urlPrefix">{{ urlPrefixShort }}</span></template>
               </ElInput>
               <p class="field-tip">只能用小写字母、数字和连字符；改了以后旧链接会失效</p>
             </ElFormItem>
@@ -330,7 +335,7 @@ function restoreVersion(v: QuestionVersionDetail) {
               </div>
             </ElFormItem>
             <ElFormItem label="标签">
-              <ElSelect v-model="form.tags" multiple filterable allow-create :multiple-limit="6" placeholder="选择或输入标签">
+              <ElSelect v-model="form.tags" aria-label="标签" multiple filterable allow-create :multiple-limit="6" placeholder="选择或输入标签">
                 <ElOption v-for="t in QUESTION_TAGS" :key="t" :label="t" :value="t" />
               </ElSelect>
             </ElFormItem>
@@ -342,7 +347,7 @@ function restoreVersion(v: QuestionVersionDetail) {
               <p class="field-tip">{{ form.status === 'draft' ? '草稿只在后台可见' : '保存后前台立即可见' }}</p>
             </ElFormItem>
             <ElFormItem label="排序">
-              <ElInputNumber v-model="form.sort" :min="0" :step="10" controls-position="right" placeholder="排在最后" />
+              <ElInputNumber v-model="form.sort" aria-label="排序" :min="0" :step="10" controls-position="right" placeholder="排在最后" />
               <p class="field-tip">越小越靠前；留空排在分类末尾</p>
             </ElFormItem>
           </ElForm>
@@ -642,7 +647,7 @@ function restoreVersion(v: QuestionVersionDetail) {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  direction: rtl;
+  color: var(--c-text-2);
 }
 
 .field-tip {

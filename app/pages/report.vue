@@ -50,7 +50,8 @@ function delta(key: keyof WeekStats, unit = '') {
   const prev = r.previous[key]
   if (cur === null || prev === null) return null
   const d = Math.round(((cur as number) - (prev as number)) * 10) / 10
-  if (!d) return { text: '和上周持平', tone: '' }
+  // 学习时长差不到 1 分钟也算持平，免得出现"比上周多不到 1 分钟"
+  if (!d || (key === 'studySeconds' && Math.abs(d) < 60)) return { text: '和上周持平', tone: '' }
   const shown = key === 'studySeconds' ? duration(Math.abs(d)) : `${Math.abs(d)}${unit}`
   return { text: `比上周${d > 0 ? '多' : '少'} ${shown}`, tone: d > 0 ? 'up' : 'down' }
 }
@@ -148,7 +149,7 @@ const hasData = computed(() => {
             <p class="block-title">每天学习时长</p>
             <ol class="days">
               <li v-for="(d, i) in report.daily" :key="d.date" :title="`${fmtDate(d.date)}：阅读 ${duration(d.seconds)}，复习 ${d.reviews} 次，AI 面试 ${d.interviews} 题`">
-                <span class="day-val">{{ d.seconds ? Math.round(d.seconds / 60) : '' }}</span>
+                <span class="day-val">{{ d.seconds ? (d.seconds < 60 ? '<1' : Math.round(d.seconds / 60)) : '' }}</span>
                 <span class="day-bar"><i :style="{ height: `${Math.max(d.seconds ? 4 : 0, (d.seconds / dayMax) * 100)}%` }" /></span>
                 <span class="day-marks" aria-hidden="true">
                   <b v-if="d.reviews" class="m-review" />
@@ -414,7 +415,7 @@ const hasData = computed(() => {
 
 .m-bar {
   border-radius: 2px !important;
-  background: var(--c-brand-soft);
+  background: color-mix(in srgb, var(--c-brand) 28%, var(--c-bg-mute));
 }
 
 .day-name {
@@ -444,12 +445,13 @@ const hasData = computed(() => {
   stroke: var(--c-divider);
 }
 
+/* 往周的柱子要看得见：原来用 8% 透明度的品牌色，白底上几乎看不出来 */
 .tbar {
-  fill: var(--c-brand-soft);
+  fill: color-mix(in srgb, var(--c-brand) 28%, var(--c-bg-mute));
 }
 
 .tbar.cur {
-  fill: color-mix(in srgb, var(--c-brand) 45%, var(--c-brand-soft));
+  fill: var(--c-brand-solid);
 }
 
 .tlabel {

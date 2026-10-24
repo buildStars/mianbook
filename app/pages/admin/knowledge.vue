@@ -171,7 +171,7 @@ const MODE_LABELS = { hybrid: '混合检索', keyword: '只用关键词', vector
         </div>
         <div class="a-card-body">
           <form class="search" @submit.prevent="search">
-            <ElInput v-model="query" placeholder="输入用户可能会问的问题，比如：热点 key 过期导致数据库被打爆" clearable />
+            <ElInput v-model="query" aria-label="检索调试的问题" placeholder="输入用户可能会问的问题，比如：热点 key 过期导致数据库被打爆" clearable />
             <div class="a-seg" role="group" aria-label="检索方式">
               <button v-for="(label, key) in MODE_LABELS" :key="key" type="button" :aria-pressed="only === key" @click="only = key">{{ label }}</button>
             </div>

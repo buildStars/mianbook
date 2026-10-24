@@ -187,7 +187,7 @@ const steps = [
 
       <ol class="parts">
         <li v-for="(part, i) in outline" :key="part.id" class="part">
-          <span class="part-no serif">{{ String(i + 1).padStart(2, '0') }}</span>
+          <span class="part-no serif" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span>
           <div class="part-main">
             <div class="part-head">
               <h3 class="serif"><NuxtLink :to="firstPathOf(part)">{{ part.title }}</NuxtLink></h3>

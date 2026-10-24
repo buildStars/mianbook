@@ -102,6 +102,7 @@ function move(step: number) {
             </a>
           </li>
         </ul>
+        <p v-else-if="query.trim() && loading" class="empty">搜索中…</p>
         <p v-else-if="query.trim() && !loading" class="empty">没有找到"{{ query }}"相关的题目，换个说法试试</p>
         <div v-else-if="!query.trim()" class="suggest">
           <p>试试搜索</p>
@@ -125,6 +126,8 @@ function move(step: number) {
   inset: 0;
   z-index: 100;
   display: flex;
+  /* 顶部对齐：默认 stretch 会把弹窗拉到 70vh，结果少时下面一大片空白 */
+  align-items: flex-start;
   justify-content: center;
   padding: 12vh 16px 16px;
   background: rgba(20, 18, 15, 0.45);

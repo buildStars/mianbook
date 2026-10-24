@@ -44,7 +44,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
 
     <div class="a-card list">
       <div class="filters">
-        <ElInput v-model="q" placeholder="按昵称或邮箱搜索" clearable class="search">
+        <ElInput v-model="q" aria-label="按昵称或邮箱搜索用户" placeholder="按昵称或邮箱搜索" clearable class="search">
           <template #prefix><AdminIcon name="search" :size="16" /></template>
         </ElInput>
       </div>
@@ -64,7 +64,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
         </ElTableColumn>
         <ElTableColumn label="角色" width="130">
           <template #default="{ row }">
-            <ElSelect :model-value="row.role" size="small" :disabled="row.id === me?.id" @change="(v: 'admin' | 'user') => changeRole(row as AdminUserRow, v)">
+            <ElSelect :model-value="row.role" :aria-label="`${row.name}的角色`" size="small" :disabled="row.id === me?.id" @change="(v: 'admin' | 'user') => changeRole(row as AdminUserRow, v)">
               <ElOption label="管理员" value="admin" />
               <ElOption label="普通用户" value="user" />
             </ElSelect>

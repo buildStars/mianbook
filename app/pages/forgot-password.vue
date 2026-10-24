@@ -79,23 +79,23 @@ async function submit() {
       <p v-if="!options.passwordReset" class="notice">站点还没有配置发信邮箱，暂时不能自助重置密码，请联系管理员。</p>
 
       <ElForm v-else label-position="top" size="large" @submit.prevent="submit">
-        <ElFormItem label="邮箱">
-          <ElInput v-model="form.email" type="email" autocomplete="email" placeholder="you@example.com" />
+        <ElFormItem label="邮箱" for="reset-email">
+          <ElInput id="reset-email" v-model="form.email" type="email" autocomplete="email" placeholder="you@example.com" />
         </ElFormItem>
-        <ElFormItem label="邮箱验证码">
+        <ElFormItem label="邮箱验证码" for="reset-code">
           <div class="code-row">
-            <ElInput v-model="form.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" />
+            <ElInput id="reset-code" v-model="form.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" />
             <button type="button" class="btn code-btn" :disabled="sending || countdown > 0" @click="sendCode">
               {{ countdown > 0 ? `${countdown} 秒后重发` : sending ? '发送中…' : sent ? '重新发送' : '获取验证码' }}
             </button>
           </div>
           <p v-if="hint" class="code-hint">{{ hint }}</p>
         </ElFormItem>
-        <ElFormItem label="新密码">
-          <ElInput v-model="form.password" type="password" show-password autocomplete="new-password" placeholder="至少 8 位" />
+        <ElFormItem label="新密码" for="reset-password">
+          <ElInput id="reset-password" v-model="form.password" type="password" show-password autocomplete="new-password" placeholder="至少 8 位" />
         </ElFormItem>
-        <ElFormItem label="再输一次">
-          <ElInput v-model="form.confirm" type="password" show-password autocomplete="new-password" placeholder="和上面一样" />
+        <ElFormItem label="再输一次" for="reset-confirm">
+          <ElInput id="reset-confirm" v-model="form.confirm" type="password" show-password autocomplete="new-password" placeholder="和上面一样" />
         </ElFormItem>
         <p v-if="errorMsg" class="error" role="alert">{{ errorMsg }}</p>
         <button type="submit" class="btn btn-primary btn-lg submit" :disabled="loading || !form.code || form.password.length < 8">
