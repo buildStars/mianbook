@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ReviewGrade, ReviewItem } from '#shared/types/handbook'
 
-useHead({ title: '今日复习 | 全栈面试手册' })
+useHead({ title: '今日复习' })
 
 const { loggedIn } = useUserSession()
 const { summary, refresh } = useReview()

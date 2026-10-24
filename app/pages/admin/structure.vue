@@ -2,7 +2,7 @@
 import type { AdminCategory, AdminPart } from '~/composables/useAdminStructure'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: '分类 | 全栈面试手册' })
+useHead({ title: '分类' })
 
 const { structure, refresh } = useAdminStructure()
 

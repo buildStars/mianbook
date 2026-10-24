@@ -561,20 +561,8 @@ kbd,
   color: var(--st-fuzzy);
 }
 
-/* 站点标志：印章 + 字标 */
+/* 站点标志：印章（BrandSeal 组件，尺寸由 size 决定）+ 字标 */
 .seal {
-  display: inline-flex;
+  display: block;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  background: var(--c-seal);
-  color: #fff;
-  font-family: var(--font-serif);
-  font-size: 18px;
-  font-weight: 900;
-  line-height: 1;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
 }

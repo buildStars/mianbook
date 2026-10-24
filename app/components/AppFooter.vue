@@ -2,6 +2,7 @@
 const { outline, firstPathOf } = useOutline()
 const { loggedIn, user } = useUserSession()
 const searchOpen = useState('search-open', () => false)
+const siteName = useRuntimeConfig().public.siteName
 </script>
 
 <template>
@@ -9,8 +10,8 @@ const searchOpen = useState('search-open', () => false)
     <div class="container inner">
       <div class="about">
         <NuxtLink to="/" class="brand">
-          <span class="seal" aria-hidden="true">面</span>
-          <span class="serif">全栈面试手册</span>
+          <BrandSeal :size="30" />
+          <span class="serif">{{ siteName }}</span>
         </NuxtLink>
         <p>把高频面试题讲成自己的话。<br>先想、再看、被追问、再复习。</p>
       </div>
@@ -42,7 +43,7 @@ const searchOpen = useState('search-open', () => false)
     </div>
     <div class="container">
       <div class="bottom">
-        <span>© {{ new Date().getFullYear() }} 全栈面试手册</span>
+        <span>© {{ new Date().getFullYear() }} {{ siteName }} · mianbook.ink</span>
         <span>内容持续更新 · 学习记录登录后多端同步</span>
       </div>
     </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ApiTokenView } from '#shared/types/token'
 
-useHead({ title: '接入 AI 工具 | 全栈面试手册' })
+useHead({ title: '接入 AI 工具' })
 
 const { loggedIn } = useUserSession()
 // 部署在 Caddy 后面：服务端渲染时按 X-Forwarded-* 取 https 和域名，和浏览器里看到的一致

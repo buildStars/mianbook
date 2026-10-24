@@ -32,7 +32,7 @@ const end = ref<HTMLElement>()
 let controller: AbortController | null = null
 let lastRequest: { action: 'start' | 'answer' | 'skip' | 'finish'; answer?: string } | null = null
 
-useHead({ title: '面试 | Agent 面试官 | 全栈面试手册' })
+useHead({ title: '面试 | Agent 面试官' })
 
 const finished = computed(() => detail.value?.status === 'finished')
 const timeline = computed(() => [...(detail.value?.timeline ?? []), ...live.value])

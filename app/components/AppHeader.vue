@@ -2,6 +2,7 @@
 defineProps<{ withMenu?: boolean }>()
 
 const route = useRoute()
+const siteName = useRuntimeConfig().public.siteName
 const { outline, all, firstPathOf } = useOutline()
 const { records } = useStudy()
 const { loggedIn, user, clear } = useUserSession()
@@ -56,9 +57,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h16" /></svg>
       </button>
 
-      <NuxtLink to="/" class="brand" aria-label="全栈面试手册首页">
-        <span class="seal" aria-hidden="true">面</span>
-        <span class="brand-text">全栈面试手册</span>
+      <NuxtLink to="/" class="brand" :aria-label="`${siteName}首页`">
+        <BrandSeal :size="30" />
+        <span class="brand-text">{{ siteName }}</span>
       </NuxtLink>
 
       <nav class="nav" aria-label="题库分区">

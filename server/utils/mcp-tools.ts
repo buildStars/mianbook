@@ -25,7 +25,7 @@ const searchHandbookTool: McpTool<McpContext> = {
   name: 'search_handbook',
   title: '检索手册',
   description:
-    '在全栈面试手册里检索和问题相关的段落（关键词 + 向量混合检索），返回段落原文和题目链接。回答前端、后端、AI 应用开发的技术或面试问题前先调用它，回答时附上题目链接作为出处。',
+    '在面书的题库里检索和问题相关的段落（关键词 + 向量混合检索），返回段落原文和题目链接。回答前端、后端、AI 应用开发的技术或面试问题前先调用它，回答时附上题目链接作为出处。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -301,7 +301,7 @@ const prompts = (site: string): McpPrompt[] => [
 export const MCP_TOOLS: McpTool<McpContext>[] = [searchHandbookTool, findQuestionsTool, getQuestionTool, pickQuizTool, profileTool, dueTool, recordTool]
 
 export async function mcpServerDef(baseUrl: string): Promise<McpServerDef<McpContext>> {
-  const site = String(useRuntimeConfig().public.siteName || '全栈面试手册')
+  const site = String(useRuntimeConfig().public.siteName || '面书')
   const total = (await getOutline()).reduce((n, p) => n + p.categories.reduce((m, c) => m + c.questions.length, 0), 0)
   return {
     info: { name: 'mianbook', title: site, version: '1.0.0' },

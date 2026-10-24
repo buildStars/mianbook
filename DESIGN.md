@@ -1,6 +1,6 @@
 # 设计规范
 
-全栈面试手册的视觉风格是**编辑部手册风**：暖白纸色背景、墨黑正文、思源宋体标题，像一本排版讲究的书。所有颜色、字体、圆角、阴影都定义成 CSS 变量，在 `app/assets/css/main.css` 里；题目正文的排版在 `app/assets/css/content.css` 里。
+面书（mianbook.ink）的视觉风格是**编辑部手册风**：暖白纸色背景、墨黑正文、思源宋体标题，像一本排版讲究的书。所有颜色、字体、圆角、阴影都定义成 CSS 变量，在 `app/assets/css/main.css` 里；题目正文的排版在 `app/assets/css/content.css` 里。
 
 ## 颜色：每种颜色只做一件事
 
@@ -49,11 +49,20 @@
 | `.chip` / `.tag` | 胶囊标签 / 方角标签 |
 | `.switch` | 开关：`<button role="switch" :aria-checked>` 内放 `.switch-track` |
 | `.dot.is-weak` 等 | 掌握程度圆点 |
-| `.seal` | 印章标志 |
+| `<BrandSeal :size>` | 站点标志（印章「面」），见下面的"站点标志" |
 | `.eyebrow` | 区块上方的小号字距标签 |
 | `.serif` / `.ai-text` | 宋体 / 渐变文字 |
 
 阅读端用自己写的组件；管理后台和登录表单用 Element Plus，它的主色、圆角、背景、文字色都映射到上面的变量，深浅模式自动跟随。后台的写法见下面的"管理后台"。
+
+## 站点标志
+
+站名是**面书**（和域名 mianbook.ink 对应：面 = mian，书 = book），标志是带内框的白文印「面」：印章红底、白字、内圈细框。
+
+- 字形是思源宋体 Black（wght 900）的「面」，导出成矢量路径，换算到 100×100 坐标（字框 62、居中），不依赖用户设备上的字体。页面里用 `BrandSeal` 组件；24px 以下自动去掉内框、字放大到 74，否则会糊
+- 站名只在 `nuxt.config.ts` 的 `runtimeConfig.public.siteName` 写一次：页面标题由 `app.vue` 的 titleTemplate 拼成"页面标题 | 面书"，页面里只写自己的标题；邮件、MCP、问手册提示词也读这个配置
+- `public/` 下的素材都来自同一个字形：`favicon.svg`（无内框）、`favicon.ico`（16/32/48）、`apple-touch-icon.png`（180，满版无圆角，iOS 自己裁圆角）、`icon-192/512.png`、`icon-maskable-512.png`（无内框，字缩进安全区）、`og.png`（分享卡片 1200×630）。改标志时先改 `BrandSeal.vue` 和 `favicon.svg`，再用浏览器把 SVG 按这些尺寸截成 PNG
+- 印章红只用于标志；分享卡片上不写题目数量，免得过期
 
 ## 题目正文的结构
 

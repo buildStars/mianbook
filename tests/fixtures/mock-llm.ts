@@ -338,7 +338,7 @@ export async function startMockLlm(): Promise<MockLlm> {
       ? REPORT
       : system.includes('写题目解析')
         ? AUTHORED
-        : system.includes('全栈面试手册」的问答助手')
+        : system.includes('面书」的问答助手')
           ? ASK
           : feedback(user)
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })

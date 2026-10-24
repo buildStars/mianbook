@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AskDoneEvent, AskSourceView, AskSourcesEvent } from '#shared/types/ask'
 
-useHead({ title: '问手册 | 全栈面试手册' })
+useHead({ title: '问手册' })
 
 interface AiStatus {
   enabled: boolean

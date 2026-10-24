@@ -2,7 +2,7 @@
 import type { AdminDashboard } from '#shared/types/admin'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: '概览 | 全栈面试手册' })
+useHead({ title: '概览' })
 
 // 按浏览器所在时区统计每天的数据，所以在客户端请求
 const data = ref<AdminDashboard | null>(null)

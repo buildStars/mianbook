@@ -2,7 +2,7 @@
 export default defineEventHandler(async (event) => {
   const admin = await requireAdmin(event)
   if (!mailConfigured()) throw createError({ statusCode: 400, message: '还没有配置发信邮箱：在 .env 里填写 NUXT_MAIL_HOST、NUXT_MAIL_USER、NUXT_MAIL_PASS' })
-  const site = String(useRuntimeConfig().public.siteName || '全栈面试手册')
+  const site = String(useRuntimeConfig().public.siteName || '面书')
   try {
     await sendMail({
       to: admin.email,

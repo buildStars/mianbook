@@ -82,7 +82,7 @@ if (user) {
     NUXT_MAIL_PORT: '465',
     NUXT_MAIL_USER: user,
     NUXT_MAIL_PASS: pass,
-    NUXT_MAIL_FROM: `"全栈面试手册 <${user}>"`,
+    NUXT_MAIL_FROM: `"面书 <${user}>"`,
   })
 }
 

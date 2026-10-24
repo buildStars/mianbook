@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: '注册 | 全栈面试手册' })
+useHead({ title: '注册' })
 </script>
 
 <template>

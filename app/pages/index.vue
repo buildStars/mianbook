@@ -1,5 +1,7 @@
 <script setup lang="ts">
-useHead({ title: '全栈面试手册 · 把面试题讲成自己的话' })
+const siteName = useRuntimeConfig().public.siteName
+// 首页标题自己写全，不套"| 站名"
+useHead({ title: `${siteName} · 把面试题讲成自己的话`, titleTemplate: null })
 
 const { outline, all, firstPathOf } = useOutline()
 const { records } = useStudy()
@@ -48,7 +50,7 @@ const steps = [
     <section class="hero">
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">全栈面试手册 · 前端 / 后端 / AI 应用</p>
+          <p class="eyebrow">{{ siteName }} · 前端 / 后端 / AI 应用</p>
           <h1 class="serif">
             把面试题，<br>讲成<span class="underline">自己的话<svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true"><path d="M2 10 C 50 3, 120 3, 198 8" /></svg></span>
           </h1>

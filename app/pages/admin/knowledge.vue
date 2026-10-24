@@ -2,7 +2,7 @@
 import type { RagDebugResult, RagStatus } from '#shared/types/ask'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: '知识库 | 全栈面试手册' })
+useHead({ title: '知识库' })
 
 const { data: status, refresh } = await useFetch<RagStatus>('/api/admin/rag', { key: 'admin-rag' })
 const syncing = ref(false)

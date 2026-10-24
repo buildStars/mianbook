@@ -2,7 +2,7 @@
 import type { AdminUserRow } from '#shared/types/admin'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: '用户 | 全栈面试手册' })
+useHead({ title: '用户' })
 
 const { user: me } = useUserSession()
 const { data: users, refresh } = await useFetch<AdminUserRow[]>('/api/admin/users', { default: () => [] })

@@ -35,7 +35,7 @@ const showDetails = ref<number | null>(null)
 const textarea = ref<HTMLTextAreaElement>()
 let controller: AbortController | null = null
 
-useHead({ title: computed(() => `${detail.value?.title ?? '模拟面试'} | 全栈面试手册`) })
+useHead({ title: computed(() => detail.value?.title ?? '模拟面试') })
 
 async function load() {
   try {

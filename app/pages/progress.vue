@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CategoryInsight, OutlineQuestion, StudyStatus } from '#shared/types/handbook'
 
-useHead({ title: '我的进度 | 全栈面试手册' })
+useHead({ title: '我的进度' })
 
 const { outline, all } = useOutline()
 const { records, ready, importRecords, clearAll } = useStudy()
@@ -176,7 +176,7 @@ function onExport() {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `面试手册学习记录-${new Date().toISOString().slice(0, 10)}.json`
+  a.download = `面书学习记录-${new Date().toISOString().slice(0, 10)}.json`
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   message.value = '已导出'

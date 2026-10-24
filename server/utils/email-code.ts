@@ -116,7 +116,7 @@ export async function consumeEmailCode(email: string, purpose: CodePurpose, code
 }
 
 function codeMail(to: string, code: string, purpose: CodePurpose, byAdmin = false): MailMessage {
-  const site = String(useRuntimeConfig().public.siteName || '全栈面试手册')
+  const site = String(useRuntimeConfig().public.siteName || '面书')
   const label = purpose === 'reset' ? '重置密码验证码' : '注册验证码'
   const intro = byAdmin
     ? `管理员为你在${site}的账号发起了重置密码，验证码是：`

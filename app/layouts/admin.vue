@@ -3,6 +3,7 @@ import '~/assets/css/admin.css'
 import type { AdminIconName } from '~/components/admin/Icon.vue'
 
 const route = useRoute()
+const siteName = useRuntimeConfig().public.siteName
 const { user, clear } = useUserSession()
 
 const groups: { label: string; items: { path: string; label: string; icon: AdminIconName }[] }[] = [
@@ -39,8 +40,8 @@ async function logout() {
   <div class="admin">
     <aside class="side">
       <NuxtLink to="/admin" class="brand">
-        <span class="seal" aria-hidden="true">面</span>
-        <span class="brand-name serif">面试手册</span>
+        <BrandSeal :size="28" />
+        <span class="brand-name serif">{{ siteName }}</span>
         <span class="brand-tag">后台</span>
       </NuxtLink>
 
@@ -117,12 +118,6 @@ async function logout() {
   gap: 10px;
   padding: 0 8px 22px;
   color: var(--c-text-1);
-}
-
-.brand .seal {
-  width: 28px;
-  height: 28px;
-  font-size: 16px;
 }
 
 .brand-name {

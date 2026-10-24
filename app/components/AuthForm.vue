@@ -81,7 +81,7 @@ async function submit() {
   <div class="auth container">
     <div class="auth-card">
       <aside class="side" aria-hidden="true">
-        <span class="seal side-seal">面</span>
+        <BrandSeal :size="44" />
         <p class="side-title serif">把面试题，<br>讲成自己的话。</p>
         <ul class="perks">
           <li><i>✓</i>{{ all.length || '近百' }} 道高频题：一句话回答、详解、追问、易错点</li>
@@ -193,13 +193,6 @@ async function submit() {
     radial-gradient(closest-side, rgba(59, 91, 255, 0.4), transparent 70%),
     radial-gradient(closest-side at 70% 40%, rgba(139, 92, 246, 0.35), transparent 70%);
   filter: blur(10px);
-}
-
-.side-seal {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  font-size: 24px;
 }
 
 .side-title {

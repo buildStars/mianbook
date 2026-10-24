@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: '重置密码 | 全栈面试手册' })
+useHead({ title: '重置密码' })
 
 const route = useRoute()
 const { fetch: refreshSession } = useUserSession()

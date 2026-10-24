@@ -80,7 +80,7 @@ if (!isNew.value) {
   savedAt.value = q.updatedAt
 }
 
-useHead(() => ({ title: `${isNew.value ? '新建题目' : plainTitle(form.title) || '编辑题目'} | 全栈面试手册` }))
+useHead(() => ({ title: isNew.value ? '新建题目' : plainTitle(form.title) || '编辑题目' }))
 
 // ---------- 未保存的修改 ----------
 // 和上次保存的内容比较，改回去了就不算未保存

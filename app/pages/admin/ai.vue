@@ -2,7 +2,7 @@
 import type { AdminAiSettings } from '#shared/types/admin'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: 'AI 设置 | 全栈面试手册' })
+useHead({ title: 'AI 设置' })
 
 interface CheckResult {
   baseUrl: string

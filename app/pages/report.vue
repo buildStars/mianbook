@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { WeekStats, WeeklyReport } from '#shared/types/handbook'
 
-useHead({ title: '学习周报 | 全栈面试手册' })
+useHead({ title: '学习周报' })
 
 const { loggedIn } = useUserSession()
 const report = ref<WeeklyReport | null>(null)

@@ -15,7 +15,7 @@ if (error.value || !question.value) {
 }
 
 useHead(() => ({
-  title: question.value ? `${plainTitle(question.value.title)} | 全栈面试手册` : '全栈面试手册',
+  title: question.value ? plainTitle(question.value.title) : '',
 }))
 
 const quiz = useQuizMode()

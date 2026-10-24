@@ -2,7 +2,7 @@
 import type { AgentSessionSummary } from '#shared/types/agent'
 import type { MockDifficulty, MockSessionSummary } from '#shared/types/handbook'
 
-useHead({ title: '模拟面试 | 全栈面试手册' })
+useHead({ title: '模拟面试' })
 
 interface AiStatus {
   enabled: boolean

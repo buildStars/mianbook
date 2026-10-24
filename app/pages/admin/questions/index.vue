@@ -2,7 +2,7 @@
 import type { TableInstance } from 'element-plus'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: '题目 | 全栈面试手册' })
+useHead({ title: '题目' })
 
 interface Row {
   id: number

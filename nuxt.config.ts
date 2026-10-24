@@ -1,9 +1,5 @@
 import { fileURLToPath } from 'node:url'
 
-// 站点标志：印章红底白字"面"
-const favicon =
-  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23c8372d'/><text x='32' y='45' font-size='36' font-weight='700' font-family='serif' text-anchor='middle' fill='white'>面</text></svg>"
-
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   devtools: { enabled: false },
@@ -25,13 +21,20 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'zh-CN' },
-      title: '全栈面试手册',
+      title: '面书',
       meta: [
-        { name: 'description', content: '前端、后端、LLM 与 Agent 面试题详解，带 AI 模拟面试官' },
+        { name: 'description', content: '面书：前端、后端、AI 应用高频面试题详解，一句话回答、追问和易错点，读完再让 AI 面试官考你一遍' },
+        { name: 'apple-mobile-web-app-title', content: '面书' },
         { name: 'theme-color', content: '#faf9f6', media: '(prefers-color-scheme: light)' },
         { name: 'theme-color', content: '#131315', media: '(prefers-color-scheme: dark)' },
       ],
-      link: [{ rel: 'icon', href: favicon }],
+      // 标志素材在 public/，生成方法见 DESIGN.md「站点标志」
+      link: [
+        { rel: 'icon', href: '/favicon.ico', sizes: '48x48' },
+        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+      ],
     },
   },
 
@@ -91,7 +94,7 @@ export default defineNuxtConfig({
       port: 465,
       user: '',
       pass: '',
-      // 发件人，例如 全栈面试手册 <xxx@qq.com>；不填时用 user
+      // 发件人，例如 面书 <xxx@qq.com>；不填时用 user
       from: '',
       outboxDir: '',
     },
@@ -106,7 +109,7 @@ export default defineNuxtConfig({
       codeDailyTotal: 500,
     },
     public: {
-      siteName: '全栈面试手册',
+      siteName: '面书',
     },
   },
 })
