@@ -292,11 +292,13 @@ async function onClear() {
           <span class="stat-label">收藏</span>
           <strong class="serif">{{ stats.star }}</strong>
           <p>想反复看的题</p>
+          <NuxtLink to="/favorites" class="stat-link">查看收藏 →</NuxtLink>
         </div>
         <div class="stat">
           <span class="stat-label">笔记</span>
           <strong class="serif">{{ stats.note }}</strong>
           <p>用自己的话写下的复述</p>
+          <NuxtLink to="/favorites?tab=notes" class="stat-link">查看笔记 →</NuxtLink>
         </div>
       </div>
     </section>
@@ -618,6 +620,15 @@ async function onClear() {
 .stat .btn {
   align-self: flex-start;
   margin-top: auto;
+}
+
+.stat-link {
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-brand);
 }
 
 .stat.review.hot strong {

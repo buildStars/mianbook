@@ -45,6 +45,8 @@ export default defineNuxtConfig({
     '/mock/*': { headers: { 'X-Robots-Tag': 'noindex' } },
     '/mock/agent/*': { headers: { 'X-Robots-Tag': 'noindex' } },
     '/progress': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/me': { headers: { 'X-Robots-Tag': 'noindex' } },
+    '/favorites': { headers: { 'X-Robots-Tag': 'noindex' } },
     '/review': { headers: { 'X-Robots-Tag': 'noindex' } },
     '/report': { headers: { 'X-Robots-Tag': 'noindex' } },
     '/connect': { headers: { 'X-Robots-Tag': 'noindex' } },

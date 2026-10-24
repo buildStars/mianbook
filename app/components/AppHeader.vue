@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// 手机上打开目录的按钮在底部栏（docs/MobileBar），页头不再放
+/**
+ * 页头。宽屏：题库（展开全部分类）、复习、模拟面试、问手册；右边搜索、深浅色和"我的"面板。
+ * 窄屏只留标志、搜索、深浅色和头像（去个人中心），其余入口在底部标签栏；题目页打开目录的按钮在底部栏（docs/MobileBar）
+ */
 const route = useRoute()
 const siteName = useRuntimeConfig().public.siteName
-const { outline, all, firstPathOf } = useOutline()
-const { records } = useStudy()
-const { loggedIn, user, clear } = useUserSession()
+const { loggedIn, user } = useUserSession()
 const { summary } = useReview()
 const dueToday = computed(() => summary.value?.dueToday ?? 0)
 const colorMode = useColorMode()
@@ -17,19 +18,6 @@ const loginLink = computed(() =>
 
 const isDark = computed(() => colorMode.value === 'dark')
 const toggleTheme = () => (colorMode.preference = isDark.value ? 'light' : 'dark')
-
-/** 进度入口上的小圆环：已掌握 / 总题数 */
-const mastered = computed(() => all.value.filter((q) => records.value[q.id]?.status === 'mastered').length)
-const ring = computed(() => {
-  const c = 2 * Math.PI * 8
-  const pct = all.value.length ? mastered.value / all.value.length : 0
-  return { c, offset: c * (1 - pct) }
-})
-
-async function logout() {
-  await clear()
-  await navigateTo('/')
-}
 
 function onKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -50,16 +38,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <span class="brand-text">{{ siteName }}</span>
       </NuxtLink>
 
-      <nav class="nav" aria-label="题库分区">
-        <NuxtLink
-          v-for="part in outline"
-          :key="part.id"
-          :to="firstPathOf(part)"
-          :class="{ active: route.path.startsWith(`/${part.slug}/`) }"
-        >
-          {{ part.title }}
-        </NuxtLink>
-        <span class="nav-sep" aria-hidden="true" />
+      <nav class="nav" aria-label="主导航">
+        <AppLibraryMenu />
         <NuxtLink to="/review" :class="{ active: route.path === '/review' }">
           复习<span v-if="dueToday" class="nav-badge" :aria-label="`今天待复习 ${dueToday} 道`">{{ dueToday > 99 ? '99+' : dueToday }}</span>
         </NuxtLink>
@@ -74,31 +54,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <span class="search-keys kbd-hint"><kbd>Ctrl</kbd><kbd>K</kbd></span>
         </button>
 
-        <NuxtLink
-          to="/progress"
-          class="progress-link"
-          :class="{ active: route.path === '/progress' }"
-          title="我的进度"
-          :aria-label="`我的进度：已掌握 ${mastered} / ${all.length}`"
-        >
-          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-            <circle cx="10" cy="10" r="8" fill="none" stroke="var(--c-divider)" stroke-width="3" />
-            <circle
-              cx="10"
-              cy="10"
-              r="8"
-              fill="none"
-              stroke="var(--st-mastered)"
-              stroke-width="3"
-              stroke-linecap="round"
-              :stroke-dasharray="ring.c"
-              :stroke-dashoffset="ring.offset"
-              transform="rotate(-90 10 10)"
-            />
-          </svg>
-          <span class="progress-text">我的进度</span>
-        </NuxtLink>
-
         <ClientOnly>
           <button type="button" class="icon-btn" :aria-label="isDark ? '切换到浅色模式' : '切换到深色模式'" @click="toggleTheme">
             <svg v-if="isDark" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -107,24 +62,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <template #fallback><span class="icon-btn" /></template>
         </ClientOnly>
 
-        <ElDropdown v-if="loggedIn" trigger="click" placement="bottom-end">
-          <button type="button" class="user-btn" :title="user?.email">
-            <span class="avatar">{{ user?.name?.slice(0, 1) }}</span>
-            <span class="user-name">{{ user?.name }}</span>
-          </button>
-          <template #dropdown>
-            <ElDropdownMenu>
-              <ElDropdownItem @click="navigateTo('/progress')">我的进度</ElDropdownItem>
-              <ElDropdownItem @click="navigateTo('/review')">今日复习{{ dueToday ? `（${dueToday}）` : '' }}</ElDropdownItem>
-              <ElDropdownItem @click="navigateTo('/mock')">模拟面试</ElDropdownItem>
-              <ElDropdownItem @click="navigateTo('/ask')">问手册</ElDropdownItem>
-              <ElDropdownItem @click="navigateTo('/connect')">接入 AI 工具</ElDropdownItem>
-              <ElDropdownItem @click="navigateTo('/report')">学习周报</ElDropdownItem>
-              <ElDropdownItem v-if="user?.role === 'admin'" @click="navigateTo('/admin')">管理后台</ElDropdownItem>
-              <ElDropdownItem divided @click="logout">退出登录</ElDropdownItem>
-            </ElDropdownMenu>
-          </template>
-        </ElDropdown>
+        <AppAccountMenu class="wide-only" />
+        <NuxtLink
+          v-if="loggedIn"
+          to="/me"
+          class="me-link narrow-only"
+          :class="{ active: route.path === '/me' }"
+          :aria-label="`${user?.name}：个人中心`"
+        >
+          <span class="avatar">{{ user?.name?.slice(0, 1) }}</span>
+        </NuxtLink>
         <NuxtLink v-else :to="loginLink" class="btn btn-sm btn-primary login-btn">登录</NuxtLink>
       </div>
     </div>
@@ -213,14 +160,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   transform: scaleX(1);
 }
 
-.nav-sep {
-  align-self: center;
-  width: 1px;
-  height: 16px;
-  margin: 0 6px;
-  background: var(--c-divider);
-}
-
 .nav-badge {
   min-width: 18px;
   height: 18px;
@@ -274,33 +213,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   margin-left: auto;
 }
 
-.progress-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 9px;
-  border-radius: var(--r-md);
-  color: var(--c-text-2);
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color var(--dur);
-}
-
-.progress-link:hover,
-.progress-link.active {
-  background: var(--c-default-soft);
-  color: var(--c-text-1);
-}
-
-.progress-link circle:last-child {
-  transition: stroke-dashoffset var(--dur-slow) var(--ease);
-}
-
-.progress-text {
-  display: none;
-}
-
 .icon-btn {
   display: inline-flex;
   flex: none;
@@ -327,19 +239,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   margin-left: 4px;
 }
 
-.user-btn {
-  display: flex;
+.me-link {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 10px 0 4px;
-  border: none;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-full);
-  background: none;
-  cursor: pointer;
 }
 
-.user-btn:hover {
+.me-link:hover,
+.me-link.active {
   background: var(--c-default-soft);
 }
 
@@ -356,25 +266,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   font-weight: 700;
 }
 
-.user-name {
+/* 宽屏用"我的"面板；手机和平板有底部标签栏，头像直接去个人中心 */
+.wide-only {
   display: none;
-  max-width: 96px;
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* 手机和平板有底部栏，"我的进度"在底部栏里，页头不再放（没有文字的小圆环看着像在加载）；按钮放大到 44px 方便手指点 */
+/* 手机和平板：按钮放大到 44px 方便手指点 */
 @media (max-width: 959px) {
-  .progress-link {
-    display: none;
-  }
-
   .search-btn,
-  .icon-btn,
-  .user-btn {
+  .icon-btn {
     height: 44px;
   }
 
@@ -431,10 +331,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   .search-keys {
     display: inline-flex;
   }
-
-  .progress-text {
-    display: inline;
-  }
 }
 
 @media (min-width: 960px) {
@@ -442,8 +338,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     display: flex;
   }
 
-  .user-name {
-    display: inline;
+  .wide-only {
+    display: block;
+  }
+
+  .narrow-only {
+    display: none;
   }
 }
 

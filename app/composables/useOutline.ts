@@ -9,6 +9,8 @@ export interface FlatQuestion {
   path: string
   partSlug: string
   partTitle: string
+  categoryId: number
+  categorySlug: string
   categoryTitle: string
 }
 
@@ -23,6 +25,8 @@ export function useOutline() {
           ...q,
           partSlug: part.slug,
           partTitle: part.title,
+          categoryId: cat.id,
+          categorySlug: cat.slug,
           categoryTitle: cat.title,
         })),
       ),

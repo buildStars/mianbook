@@ -24,17 +24,18 @@ const siteName = useRuntimeConfig().public.siteName
           <p class="col-title">学习</p>
           <NuxtLink to="/review">今日复习</NuxtLink>
           <NuxtLink to="/mock">模拟面试</NuxtLink>
-          <NuxtLink to="/progress">我的进度</NuxtLink>
-          <NuxtLink to="/report">学习周报</NuxtLink>
+          <NuxtLink to="/ask">问手册</NuxtLink>
+          <NuxtLink to="/connect">接入 AI 工具</NuxtLink>
           <button type="button" @click="searchOpen = true">搜索题目</button>
         </div>
         <div>
-          <p class="col-title">账号</p>
-          <template v-if="loggedIn">
-            <span class="who">{{ user?.name }}</span>
-            <NuxtLink v-if="user?.role === 'admin'" to="/admin">管理后台</NuxtLink>
-          </template>
-          <template v-else>
+          <p class="col-title">我的</p>
+          <NuxtLink to="/me">个人中心</NuxtLink>
+          <NuxtLink to="/progress">学习进度</NuxtLink>
+          <NuxtLink to="/favorites">我的收藏</NuxtLink>
+          <NuxtLink to="/report">学习周报</NuxtLink>
+          <NuxtLink v-if="user?.role === 'admin'" to="/admin">管理后台</NuxtLink>
+          <template v-if="!loggedIn">
             <NuxtLink to="/login">登录</NuxtLink>
             <NuxtLink to="/register">注册</NuxtLink>
           </template>
@@ -131,11 +132,6 @@ const siteName = useRuntimeConfig().public.siteName
 .cols a:hover,
 .cols button:hover {
   color: var(--c-text-1);
-}
-
-.who {
-  color: var(--c-text-1);
-  font-weight: 500;
 }
 
 .bottom {

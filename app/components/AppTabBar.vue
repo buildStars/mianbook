@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
  * 手机上的底部标签栏（顶部导航在窄屏隐藏）：首页、题库、复习、模拟面试、我的。
+ * "我的"是个人中心，进度、收藏、笔记、周报、问手册等入口都在那里。
  * 题目页有自己的底部操作栏（目录、上一题、AI 面试、下一题），那里不显示
  */
 const route = useRoute()
@@ -11,13 +12,15 @@ const { summary } = useReview()
 /** "题库"回到上次看的题，没有就从第一题开始 */
 const libraryPath = computed(() => last.value?.path ?? all.value[0]?.path ?? '/')
 const due = computed(() => summary.value?.dueToday ?? 0)
+/** 从个人中心进去的页面，"我的"保持选中 */
+const MINE = ['/me', '/progress', '/favorites', '/report', '/connect', '/ask']
 
 const tabs = computed(() => [
   { to: '/', label: '首页', icon: 'home', active: route.path === '/' },
   { to: libraryPath.value, label: '题库', icon: 'book', active: false },
   { to: '/review', label: '复习', icon: 'review', active: route.path === '/review', badge: due.value },
   { to: '/mock', label: '模拟面试', icon: 'mock', active: route.path.startsWith('/mock') },
-  { to: '/progress', label: '我的', icon: 'me', active: route.path === '/progress' },
+  { to: '/me', label: '我的', icon: 'me', active: MINE.includes(route.path) },
 ])
 </script>
 
