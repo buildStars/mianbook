@@ -880,6 +880,14 @@ html.dark .ai-band {
   color: #fff;
 }
 
+@media (pointer: coarse) {
+  .ai-try {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
 .ai-band h2 {
   margin: 12px 0 0;
   font-size: clamp(32px, 4vw, 48px);

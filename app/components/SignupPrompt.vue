@@ -37,4 +37,13 @@ const query = computed(() => ({ redirect: props.redirect ?? route.fullPath }))
   font-weight: 600;
   color: var(--c-brand);
 }
+
+/* 触屏设备上扩大"登录"的点按区域，不改变排版 */
+@media (pointer: coarse) {
+  .login a {
+    display: inline-block;
+    margin: -12px -6px;
+    padding: 12px 6px;
+  }
+}
 </style>

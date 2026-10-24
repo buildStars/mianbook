@@ -186,7 +186,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
 
 <template>
   <div class="page container">
-    <NuxtLink to="/mock" class="back">← 模拟面试</NuxtLink>
+    <NuxtLink to="/mock" class="back tap">← 模拟面试</NuxtLink>
 
     <div v-if="!loggedIn" class="notice card">
       <p>请先登录。</p>
@@ -270,7 +270,7 @@ const toReview = computed(() => answeredItems.value.filter((it) => (scoreOf(it) 
               />
               <div class="actions">
                 <InterviewVoiceInput v-model="answer" :maxlength="3000" />
-                <span class="count"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交 · {{ answer.length }}/3000</span>
+                <span class="count"><span class="kbd-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交 · </span>{{ answer.length }}/3000</span>
                 <button type="button" class="btn btn-sm btn-ghost" :disabled="busy" @click="skip">
                   {{ item.turns.length ? '跳过追问' : '不会，跳过' }}
                 </button>

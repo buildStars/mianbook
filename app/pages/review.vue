@@ -155,7 +155,7 @@ const nextDue = computed(() => {
 
           <div v-if="!revealed" class="think">
             <p>先在心里回答一遍，最好说出声来，再看答案。</p>
-            <button type="button" class="btn btn-primary" @click="revealed = true">显示答案 <kbd>空格</kbd></button>
+            <button type="button" class="btn btn-primary" @click="revealed = true">显示答案 <kbd class="kbd-hint">空格</kbd></button>
           </div>
 
           <template v-else>
@@ -180,7 +180,7 @@ const nextDue = computed(() => {
                 :disabled="rating"
                 @click="rate(g.grade)"
               >
-                <span class="grade-label"><kbd>{{ g.grade }}</kbd>{{ g.label }}</span>
+                <span class="grade-label"><kbd class="kbd-hint">{{ g.grade }}</kbd>{{ g.label }}</span>
                 <span class="grade-hint">{{ g.hint }}</span>
                 <span class="grade-next">{{ intervalText(current.intervals[g.grade]) }}再复习</span>
               </button>
@@ -609,6 +609,12 @@ const nextDue = computed(() => {
 .how summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+@media (pointer: coarse) {
+  .how summary {
+    padding: 10px 0;
+  }
 }
 
 .how p {

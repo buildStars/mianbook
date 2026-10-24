@@ -296,7 +296,7 @@ const formatTime = (iso: string) =>
             />
             <div class="actions">
               <InterviewVoiceInput v-model="answer" :maxlength="3000" />
-              <span class="count"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交 · {{ answer.length }}/3000</span>
+              <span class="count"><span class="kbd-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交 · </span>{{ answer.length }}/3000</span>
               <button type="button" class="btn btn-sm btn-ghost" @click="reset">结束面试</button>
               <button type="button" class="btn btn-sm btn-primary" :disabled="answer.trim().length < 2" @click="submit">
                 提交回答

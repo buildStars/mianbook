@@ -1,6 +1,5 @@
 <script setup lang="ts">
-defineProps<{ withMenu?: boolean }>()
-
+// 手机上打开目录的按钮在底部栏（docs/MobileBar），页头不再放
 const route = useRoute()
 const siteName = useRuntimeConfig().public.siteName
 const { outline, all, firstPathOf } = useOutline()
@@ -10,7 +9,6 @@ const { summary } = useReview()
 const dueToday = computed(() => summary.value?.dueToday ?? 0)
 const colorMode = useColorMode()
 const searchOpen = useState('search-open', () => false)
-const sidebarOpen = useState('sidebar-open', () => false)
 
 // 在登录、注册页上点"登录"时不要把当前页再套进 redirect
 const loginLink = computed(() =>
@@ -46,16 +44,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <header class="app-header">
     <div class="inner">
-      <button
-        v-if="withMenu"
-        type="button"
-        class="icon-btn menu-btn"
-        :aria-label="sidebarOpen ? '关闭目录' : '打开目录'"
-        :aria-expanded="sidebarOpen"
-        @click="sidebarOpen = !sidebarOpen"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h16" /></svg>
-      </button>
 
       <NuxtLink to="/" class="brand" :aria-label="`${siteName}首页`">
         <BrandSeal :size="30" />
@@ -83,7 +71,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <button type="button" class="search-btn" aria-label="搜索题目" @click="searchOpen = true">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <span class="search-text">搜索题目</span>
-          <span class="search-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+          <span class="search-keys kbd-hint"><kbd>Ctrl</kbd><kbd>K</kbd></span>
         </button>
 
         <NuxtLink
@@ -335,10 +323,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   color: var(--c-text-1);
 }
 
-.menu-btn {
-  margin-left: -8px;
-}
-
 .login-btn {
   margin-left: 4px;
 }
@@ -382,13 +366,42 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   white-space: nowrap;
 }
 
+/* 手机和平板有底部栏，"我的进度"在底部栏里，页头不再放（没有文字的小圆环看着像在加载）；按钮放大到 44px 方便手指点 */
+@media (max-width: 959px) {
+  .progress-link {
+    display: none;
+  }
+
+  .search-btn,
+  .icon-btn,
+  .user-btn {
+    height: 44px;
+  }
+
+  .icon-btn {
+    width: 44px;
+  }
+
+  .login-btn {
+    height: 40px;
+  }
+}
+
+@media (max-width: 767px) {
+  .search-btn {
+    justify-content: center;
+    width: 44px;
+    padding: 0;
+  }
+}
+
 @media (max-width: 420px) {
   .brand-text {
     font-size: 16px;
   }
 
   .inner {
-    gap: 6px;
+    gap: 4px;
     padding: 0 12px;
   }
 
@@ -399,19 +412,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
   .right {
     gap: 0;
-  }
-
-  .search-btn,
-  .icon-btn {
-    width: 34px;
-  }
-
-  .search-btn {
-    padding: 0 9px;
-  }
-
-  .progress-link {
-    padding: 0 7px;
   }
 }
 
@@ -438,10 +438,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 @media (min-width: 960px) {
-  .menu-btn {
-    display: none;
-  }
-
   .nav {
     display: flex;
   }

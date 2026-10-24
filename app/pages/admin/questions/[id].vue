@@ -272,7 +272,7 @@ function restoreVersion(v: QuestionVersionDetail) {
         <AdminIcon name="external" :size="15" />查看页面
       </a>
       <button type="button" class="btn btn-sm btn-primary" :disabled="saving" @click="save">
-        保存<kbd class="kbd">Ctrl S</kbd>
+        保存<kbd class="kbd kbd-hint">Ctrl S</kbd>
       </button>
     </header>
 

@@ -114,6 +114,20 @@ const siteName = useRuntimeConfig().public.siteName
   transition: color var(--dur);
 }
 
+/* 触屏设备上链接本身做到 44px 高，行距靠它撑开 */
+@media (pointer: coarse) {
+  .cols div {
+    gap: 0;
+  }
+
+  .cols a,
+  .cols button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
 .cols a:hover,
 .cols button:hover {
   color: var(--c-text-1);

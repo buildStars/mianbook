@@ -80,7 +80,7 @@ function move(step: number) {
             @keydown.up.prevent="move(-1)"
             @keydown.enter.prevent="go(results[active])"
           >
-          <button type="button" class="close" aria-label="关闭搜索" @click="open = false">Esc</button>
+          <button type="button" class="close" aria-label="关闭搜索" @click="open = false"><span class="kbd-hint">Esc</span><span class="touch-only">取消</span></button>
         </div>
         <button v-if="query.trim().length >= 2" type="button" class="ask" @click="askAi">
           <span class="ask-mark" aria-hidden="true">✦</span>
@@ -109,7 +109,7 @@ function move(step: number) {
             <button v-for="s in SUGGESTIONS" :key="s" type="button" class="chip" @click="query = s">{{ s }}</button>
           </div>
         </div>
-        <div class="footer">
+        <div class="footer kbd-hint">
           <span><kbd>↑</kbd><kbd>↓</kbd> 切换</span>
           <span><kbd>Enter</kbd> 打开</span>
           <span><kbd>Esc</kbd> 关闭</span>

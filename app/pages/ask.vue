@@ -257,7 +257,7 @@ function onAnswerClick(e: MouseEvent) {
             </summary>
             <ul>
               <li v-for="g in sourceGroups(turn)" :key="g.questionId" class="group" :class="{ dim: turn.phase === 'done' && !g.cited }">
-                <NuxtLink :to="g.path" class="src-title"><RichTitle :title="g.title" /></NuxtLink>
+                <NuxtLink :to="g.path" class="src-title tap"><RichTitle :title="g.title" /></NuxtLink>
                 <span class="src-meta">{{ g.category }}</span>
                 <div v-for="s in g.items" :key="s.n" class="src">
                   <span class="n num" :class="{ on: turn.citations.includes(s.n) }">{{ s.n }}</span>
@@ -293,7 +293,7 @@ function onAnswerClick(e: MouseEvent) {
           <template v-if="!loggedIn">提问前需要先注册，问题会带过去</template>
           <template v-else-if="hasKey">使用你自己的 Key</template>
           <template v-else-if="remaining !== null">24 小时内还可以问 {{ remaining }} 次</template>
-          <template v-else>Enter 发送，Shift + Enter 换行</template>
+          <span v-else class="kbd-hint">Enter 发送，Shift + Enter 换行</span>
         </span>
         <div class="actions">
           <button v-if="turns.length && !busy" type="button" class="btn btn-sm btn-ghost" @click="clearAll">清空对话</button>
@@ -562,6 +562,23 @@ function onAnswerClick(e: MouseEvent) {
   line-height: 1;
   vertical-align: 2px;
   text-decoration: none;
+}
+
+/* 编号嵌在句子里不好放大，触屏设备上用透明的伪元素把点按区域扩到 30px 左右 */
+@media (pointer: coarse) {
+  .body :deep(.cite) {
+    position: relative;
+  }
+
+  .body :deep(.cite)::after {
+    content: '';
+    position: absolute;
+    inset: -6px -5px;
+  }
+
+  .sources summary {
+    padding: 10px 0;
+  }
 }
 
 .body :deep(.cite:hover) {

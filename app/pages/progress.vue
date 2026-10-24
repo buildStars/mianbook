@@ -808,6 +808,15 @@ async function onClear() {
     box-shadow var(--dur-fast);
 }
 
+/* 触屏设备上格子加大到 26px，满足 24px 的最小点按尺寸 */
+@media (pointer: coarse) {
+  .cell {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+  }
+}
+
 .cell:hover,
 .cell:focus-visible {
   transform: scale(1.25);

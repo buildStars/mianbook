@@ -135,7 +135,7 @@ const STEP_ICONS: Record<string, string> = {
 
 <template>
   <div class="page container">
-    <NuxtLink to="/mock?mode=agent" class="back">← Agent 面试官</NuxtLink>
+    <NuxtLink to="/mock?mode=agent" class="back tap">← Agent 面试官</NuxtLink>
 
     <div v-if="!loggedIn" class="notice card">
       <p>请先登录。</p>

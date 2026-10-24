@@ -139,10 +139,10 @@ async function submit() {
         </ElForm>
         <p class="switch">
           <template v-if="mode === 'login'">
-            还没有账号？<NuxtLink :to="{ path: '/register', query: route.query }">免费注册</NuxtLink>
+            还没有账号？<NuxtLink :to="{ path: '/register', query: route.query }" class="tap">免费注册</NuxtLink>
           </template>
           <template v-else>
-            已有账号？<NuxtLink :to="{ path: '/login', query: route.query }">直接登录</NuxtLink>
+            已有账号？<NuxtLink :to="{ path: '/login', query: route.query }" class="tap">直接登录</NuxtLink>
           </template>
         </p>
       </main>

@@ -212,6 +212,13 @@ textarea:focus {
   cursor: pointer;
 }
 
+@media (pointer: coarse) {
+  .add-note {
+    min-height: 44px;
+    margin-top: 6px;
+  }
+}
+
 .hint {
   margin: 14px 0 0;
   font-size: 13px;

@@ -507,6 +507,13 @@ kbd,
   cursor: pointer;
 }
 
+/* 触屏设备上开关的点按区域至少 44px 高 */
+@media (pointer: coarse) {
+  .switch {
+    min-height: 44px;
+  }
+}
+
 .switch-track {
   position: relative;
   flex: none;
@@ -559,6 +566,34 @@ kbd,
 
 .star {
   color: var(--st-fuzzy);
+}
+
+/* 键盘快捷键提示（Ctrl + Enter、Esc 等）只给有键盘的设备看；触屏设备换成 .touch-only 里的说法 */
+.touch-only {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .kbd-hint {
+    display: none !important;
+  }
+
+  .touch-only {
+    display: inline;
+  }
+}
+
+/* 独立的小链接（返回、切换登录注册、资料标题等）：触屏设备上用透明伪元素把点按区域往外扩，不影响排版 */
+.tap {
+  position: relative;
+}
+
+@media (pointer: coarse) {
+  .tap::after {
+    content: '';
+    position: absolute;
+    inset: -10px -6px;
+  }
 }
 
 /* 站点标志：印章（BrandSeal 组件，尺寸由 size 决定）+ 字标 */

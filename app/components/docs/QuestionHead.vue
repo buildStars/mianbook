@@ -109,6 +109,12 @@ const categoryLink = computed(() => {
   color: var(--c-brand);
 }
 
+@media (pointer: coarse) {
+  .crumbs a {
+    padding: 6px 0;
+  }
+}
+
 .title {
   margin: 10px 0 0;
   font-size: 34px;

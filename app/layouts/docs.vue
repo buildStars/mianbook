@@ -9,7 +9,7 @@ watch(
 
 <template>
   <div class="docs-layout">
-    <AppHeader with-menu />
+    <AppHeader />
     <Transition name="fade">
       <div v-if="sidebarOpen" class="backdrop" @click="sidebarOpen = false" />
     </Transition>

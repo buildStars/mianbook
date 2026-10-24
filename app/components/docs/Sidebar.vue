@@ -149,6 +149,14 @@ onMounted(() =>
   }
 }
 
+/* 触屏设备上每一行至少 44px 高，手指不容易点错 */
+@media (pointer: coarse) {
+  .item,
+  .group-title {
+    min-height: 44px;
+  }
+}
+
 /* 顶部：分区切换 + 进度，滚动时固定 */
 .top {
   position: sticky;
