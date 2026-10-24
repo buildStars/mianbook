@@ -684,6 +684,29 @@ function onAnswerClick(e: MouseEvent) {
   box-shadow: var(--shadow-md);
 }
 
+/* 吸底时，上方滚过去的内容渐隐成纸色，下方留一条纸色，输入框不会和回答卡片的边框叠在一起 */
+.composer::before,
+.composer::after {
+  content: '';
+  position: absolute;
+  right: -12px;
+  left: -12px;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.composer::before {
+  bottom: 100%;
+  height: 36px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--c-bg) 0%, transparent), var(--c-bg));
+}
+
+.composer::after {
+  top: calc(100% + 1px);
+  height: 16px;
+  background: var(--c-bg);
+}
+
 .composer textarea {
   display: block;
   width: 100%;

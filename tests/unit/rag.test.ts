@@ -8,6 +8,7 @@ import {
   embedInput,
   fuseRerank,
   normalizeVector,
+  previewText,
   rankQuestions,
   rerankDocuments,
   rerankTexts,
@@ -95,6 +96,24 @@ describe('切块', () => {
 
   it('一行就超长时硬切', () => {
     expect(splitLong('字'.repeat(2000), 900).map((p) => p.length)).toEqual([900, 900, 200])
+  })
+
+  it('资料预览：去掉列表符号、表格竖线换成逗号、合成一行，代码里的 || 不动', () => {
+    const md = [
+      '- Redis 是单线程',
+      '- 6.0 起网络 I/O 多线程',
+      '',
+      '| 原因 | 说明 |',
+      '| --- | --- |',
+      '| 内存存储 | 不走磁盘 |',
+      '',
+      '```js',
+      'const ok = a || b',
+      '```',
+    ].join('\n')
+    const text = cleanMarkdown(md)
+    expect(previewText(text)).toBe('Redis 是单线程 6.0 起网络 I/O 多线程 原因，说明 内存存储，不走磁盘 const ok = a || b')
+    expect(previewText('字'.repeat(200), 140)).toHaveLength(140)
   })
 
   it('向量输入带上题目和小节', () => {

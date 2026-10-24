@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     path: h.chunk.path,
     category: h.chunk.category,
     heading: h.chunk.heading,
-    snippet: h.chunk.text.slice(0, 140),
+    snippet: previewText(h.chunk.text),
   }))
 
   const stream = createEventStream(event)

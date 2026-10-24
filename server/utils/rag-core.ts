@@ -66,6 +66,24 @@ export function cleanMarkdown(md: string): string {
     .trim()
 }
 
+/**
+ * 资料的预览（问手册里"参考了 N 段"下面那一小段）：分块文本为了检索保留了列表符号和表格竖线，
+ * 给人看时去掉列表符号、表格单元格之间换成逗号（只认两边有空格的单个竖线，代码里的 || 不动），合成一行再截断
+ */
+export function previewText(text: string, max = 140): string {
+  const flat = text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+        .replace(/(?<!\|) \| (?!\|)/g, '，')
+        .trim(),
+    )
+    .filter(Boolean)
+    .join(' ')
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat
+}
+
 /** 按段落把长文本切成不超过 max 字的几段；单个段落太长时按行切 */
 export function splitLong(text: string, max = MAX_CHARS): string[] {
   if (text.length <= max) return [text]

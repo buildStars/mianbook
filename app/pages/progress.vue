@@ -72,18 +72,19 @@ const weakest = computed(() =>
     .slice(0, 5),
 )
 
-const radarPartId = ref<number | null>(null)
-const radarPart = computed(() => outline.value.find((p) => p.id === radarPartId.value) ?? outline.value[0])
-const radar = computed(() => {
-  const cats = catStats.value.filter((c) => c.partId === radarPart.value?.id)
-  const series: { name: string; tone: 'brand' | 'ai'; values: (number | null)[] }[] = [
-    { name: '掌握度', tone: 'brand', values: cats.map((c) => c.mastery) },
-  ]
-  if (cats.some((c) => c.avgScore !== null)) {
-    series.push({ name: 'AI 面试得分', tone: 'ai', values: cats.map((c) => (c.avgScore === null ? null : c.avgScore * 10)) })
-  }
-  return { axes: cats.map((c) => c.title), series }
-})
+/**
+ * 各分类掌握度：每个分类一根横条，按掌握度从高到低排，一眼看出哪些分类还没碰。
+ * （原来是雷达图，全栈基础有二十多个分类，轴标签挤在一起看不清）
+ */
+const barPartId = ref<number | null>(null)
+const barPart = computed(() => outline.value.find((p) => p.id === barPartId.value) ?? outline.value[0])
+const partBars = computed(() =>
+  catStats.value
+    .filter((c) => c.partId === barPart.value?.id)
+    .map((c, order) => ({ ...c, order }))
+    .sort((a, b) => b.mastery - a.mastery || b.touched - a.touched || a.order - b.order),
+)
+const hasAiScore = computed(() => partBars.value.some((c) => c.avgScore !== null))
 const mockLink = (ids: number[]) => `/mock?categories=${ids.join(',')}`
 
 type Filter = 'review' | 'new' | 'star' | 'all'
@@ -153,6 +154,28 @@ const view = computed(() =>
 )
 
 const emptyText = computed(() => filters.find((f) => f.value === filter.value)!.empty)
+
+/** 清单默认只列前 10 道，题多时页面不至于拉得太长；切换筛选后重新收起 */
+const LIST_LIMIT = 10
+const listExpanded = ref(false)
+watch(filter, () => (listExpanded.value = false))
+const viewTotal = computed(() => view.value.reduce((n, p) => n + p.groups.reduce((m, g) => m + g.items.length, 0), 0))
+const shownView = computed(() => {
+  if (listExpanded.value) return view.value
+  let left = LIST_LIMIT
+  return view.value
+    .map((p) => ({
+      ...p,
+      groups: p.groups
+        .map((g) => {
+          const items = g.items.slice(0, Math.max(0, left))
+          left -= items.length
+          return { ...g, items }
+        })
+        .filter((g) => g.items.length),
+    }))
+    .filter((p) => p.groups.length)
+})
 
 const partDone = (questions: OutlineQuestion[]) => questions.filter((q) => statusOf(q) === 'mastered').length
 const cellLabel = (q: OutlineQuestion) => {
@@ -285,24 +308,35 @@ async function onClear() {
         <p>掌握度按"掌握算 1、模糊算 0.5"统计；AI 得分取每道题最近一次面试第一轮的分数</p>
       </div>
       <div class="insight-grid">
-        <div class="radar-card">
-          <div class="tabs radar-tabs" role="tablist" aria-label="选择部分">
+        <div class="bars-card">
+          <div class="tabs bars-tabs" role="tablist" aria-label="选择部分">
             <button
               v-for="p in outline"
               :key="p.id"
               type="button"
               role="tab"
-              :aria-selected="radarPart?.id === p.id"
-              :class="{ active: radarPart?.id === p.id }"
-              @click="radarPartId = p.id"
+              :aria-selected="barPart?.id === p.id"
+              :class="{ active: barPart?.id === p.id }"
+              @click="barPartId = p.id"
             >
               {{ p.title }}
             </button>
           </div>
-          <ProgressRadar v-if="radar.axes.length >= 3" :axes="radar.axes" :series="radar.series" />
-          <ul class="radar-legend">
+          <ol class="cat-bars">
+            <li v-for="c in partBars" :key="c.id">
+              <span class="cb-name" :title="c.title">{{ c.title }}</span>
+              <span class="cb-track" aria-hidden="true">
+                <i class="cb-fill" :style="{ width: `${c.mastery}%` }" />
+                <i v-if="c.avgScore !== null" class="cb-ai" :style="{ left: `${c.avgScore * 10}%` }" :title="`AI 面试均分 ${c.avgScore}`" />
+              </span>
+              <span class="cb-num num">
+                {{ c.mastery }}%<span class="visually-hidden">，学了 {{ c.touched }}/{{ c.total }} 题<template v-if="c.avgScore !== null">，AI 面试均分 {{ c.avgScore }}</template></span>
+              </span>
+            </li>
+          </ol>
+          <ul class="bars-legend">
             <li><i class="brand" />掌握度</li>
-            <li v-if="radar.series.length > 1"><i class="ai" />AI 面试得分（×10）</li>
+            <li v-if="hasAiScore"><i class="ai" />AI 面试均分（满分 10）</li>
           </ul>
         </div>
 
@@ -386,7 +420,7 @@ async function onClear() {
         <button v-if="stats.total" type="button" class="btn btn-sm" @click="randomPick">随机抽一题</button>
       </div>
 
-      <div v-for="p in view" :key="p.id" class="list-part">
+      <div v-for="p in shownView" :key="p.id" class="list-part">
         <h3 class="serif">{{ p.title }}</h3>
         <div v-for="g in p.groups" :key="g.id" class="group">
           <p class="group-title">{{ g.title }}</p>
@@ -405,6 +439,9 @@ async function onClear() {
           </ul>
         </div>
       </div>
+      <button v-if="!listExpanded && viewTotal > LIST_LIMIT" type="button" class="btn btn-sm list-more" @click="listExpanded = true">
+        展开全部 {{ viewTotal }} 道
+      </button>
     </section>
 
     <!-- 数据备份 -->
@@ -615,7 +652,7 @@ async function onClear() {
   margin-top: 20px;
 }
 
-.radar-card,
+.bars-card,
 .weak-card {
   padding: 20px 22px;
   border: 1px solid var(--c-divider);
@@ -623,36 +660,98 @@ async function onClear() {
   background: var(--c-bg-elv);
 }
 
-.radar-tabs {
+.bars-tabs {
   margin-top: 0;
 }
 
-.radar-legend {
+/* 各分类掌握度：名称 | 横条 | 百分比 */
+.cat-bars {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cat-bars li {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.cb-name {
+  overflow: hidden;
+  color: var(--c-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-track {
+  position: relative;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-mute);
+}
+
+.cb-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--c-brand-solid);
+}
+
+/* AI 面试均分：横条上的一个竖线标记 */
+.cb-ai {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 16px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--ai-via);
+}
+
+.cb-num {
+  font-weight: 600;
+  text-align: right;
+  color: var(--c-text-1);
+}
+
+.bars-legend {
   display: flex;
   justify-content: center;
   gap: 18px;
-  margin: 4px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   list-style: none;
   font-size: 12px;
   color: var(--c-text-2);
 }
 
-.radar-legend i {
+.bars-legend i {
   display: inline-block;
-  width: 14px;
-  height: 3px;
   margin-right: 6px;
   vertical-align: middle;
   border-radius: 2px;
 }
 
-.radar-legend i.brand {
-  background: var(--c-brand);
+.bars-legend i.brand {
+  width: 14px;
+  height: 6px;
+  background: var(--c-brand-solid);
 }
 
-.radar-legend i.ai {
+.bars-legend i.ai {
+  width: 3px;
+  height: 12px;
   background: var(--ai-via);
+}
+
+.list-more {
+  display: flex;
+  margin: 16px auto 0;
 }
 
 .weak-title {
