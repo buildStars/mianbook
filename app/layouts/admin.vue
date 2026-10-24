@@ -14,6 +14,7 @@ const groups: { label: string; items: { path: string; label: string; icon: Admin
       { path: '/admin/questions', label: '题目', icon: 'questions' },
       { path: '/admin/structure', label: '分类', icon: 'folder' },
       { path: '/admin/knowledge', label: '知识库', icon: 'database' },
+      { path: '/admin/feedback', label: '反馈', icon: 'alert' },
     ],
   },
   {

@@ -79,6 +79,7 @@ watch(() => question.value?.id, remember)
 
       <InterviewPanel ref="interview" :question="question" />
       <DocsStudyPanel :question-id="question.id" />
+      <DocsFeedback :question-id="question.id" />
       <DocsPrevNext :prev="question.prev" :next="question.next" />
     </article>
 

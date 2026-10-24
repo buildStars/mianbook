@@ -396,3 +396,29 @@ export const errorLogs = mysqlTable(
   },
   (t) => [index('error_logs_created_idx').on(t.createdAt)],
 )
+
+/** 题目纠错和反馈：读者在题目页提交，后台处理。没登录也能提交，按 IP 限频，IP 只存哈希 */
+export const questionFeedback = mysqlTable(
+  'question_feedback',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    questionId: int('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    /** 登录用户提交时记下是谁，方便追问；没登录时为空 */
+    userId: int('user_id').references(() => users.id, { onDelete: 'set null' }),
+    kind: mysqlEnum('kind', ['error', 'unclear', 'outdated', 'other']).notNull(),
+    content: varchar('content', { length: 1000 }).notNull(),
+    /** 提交者 IP 的 HMAC，只用来限频 */
+    ipHash: varchar('ip_hash', { length: 64 }),
+    status: mysqlEnum('status', ['open', 'resolved', 'ignored']).notNull().default('open'),
+    /** 处理（改完或忽略）的时间，重新打开时清空 */
+    handledAt: datetime('handled_at', { mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('question_feedback_status_idx').on(t.status, t.createdAt),
+    index('question_feedback_ip_idx').on(t.ipHash, t.createdAt),
+    index('question_feedback_question_idx').on(t.questionId),
+  ],
+)

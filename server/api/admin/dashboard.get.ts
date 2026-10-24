@@ -205,6 +205,8 @@ export default defineEventHandler(async (event): Promise<AdminDashboard> => {
   const alerts: AdminDashboard['alerts'] = []
   if (!apiKey) alerts.push({ level: 'warn', text: '站点没有配置 AI Key，用户只能用自己的 Key 做模拟面试', to: '/admin/ai', action: '去配置' })
   if (drafts) alerts.push({ level: 'info', text: `有 ${drafts} 道题还是草稿，前台看不到`, to: '/admin/questions?status=draft', action: '查看草稿' })
+  const openFeedback = await openFeedbackCount()
+  if (openFeedback) alerts.push({ level: 'warn', text: `有 ${openFeedback} 条读者反馈还没处理`, to: '/admin/feedback', action: '去处理' })
   if (!contentRoot()) alerts.push({ level: 'info', text: '没有找到 content 目录，后台的修改只保存在数据库里，记得定期 npm run db:export 备份' })
   if (apiKey && !pricing && sumOf(daily, 'site')) {
     alerts.push({ level: 'info', text: '填写模型价格后，可以估算站点 Key 的花费', to: '/admin/ai', action: '填写价格' })

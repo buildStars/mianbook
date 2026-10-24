@@ -190,3 +190,16 @@ export interface AdminUserDetail {
   login: { failures: number; lastFailureAt: string | null; accountLocked: boolean; lockedIps: number }
   tokens: { id: number; name: string; prefix: string; scope: 'read' | 'write'; createdAt: string; lastUsedAt: string | null; expiresAt: string | null }[]
 }
+
+/** 后台反馈列表的一行 */
+export interface AdminFeedbackRow {
+  id: number
+  kind: 'error' | 'unclear' | 'outdated' | 'other'
+  content: string
+  status: 'open' | 'resolved' | 'ignored'
+  createdAt: string
+  handledAt: string | null
+  question: { id: number; title: string; path: string; category: string; published: boolean }
+  /** 没登录提交时为空 */
+  user: { id: number; name: string; email: string } | null
+}
