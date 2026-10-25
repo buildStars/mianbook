@@ -1,5 +1,6 @@
 export interface LearningEvent {
-  type: 'read' | 'reveal' | 'voice'
+  /** code_run 在题目里运行代码、practice_pass 默写练习全部通过 */
+  type: 'read' | 'reveal' | 'voice' | 'code_run' | 'practice_pass'
   questionId?: number
   /** read、voice 的秒数 */
   value?: number

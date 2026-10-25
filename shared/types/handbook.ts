@@ -58,6 +58,8 @@ export interface QuestionDetail {
   next: QuestionLink | null
   /** 题目页底部推荐的相关题目（不含上一题、下一题） */
   related: RelatedQuestion[]
+  /** 有没有默写练习（/practice + path） */
+  practice: boolean
   updatedAt: string
 }
 
@@ -80,6 +82,8 @@ export interface CategoryDetail {
     tags: string[]
     /** 一句话回答的纯文本 */
     summary: string
+    /** 有默写练习 */
+    practice: boolean
   }[]
   /** 同一部分的其他分类 */
   siblings: { title: string; path: string; count: number }[]

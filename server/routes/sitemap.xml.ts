@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm'
 
-/** 站点地图：首页、功能入口、分类专题页和全部已发布的题目，带最后修改时间 */
+/** 站点地图：首页、功能入口、分类专题页、全部已发布的题目和默写练习，带最后修改时间 */
 export default defineEventHandler(async (event) => {
   const siteUrl = useRuntimeConfig().public.siteUrl
-  const [outline, rows] = await Promise.all([
+  const [outline, practice, rows] = await Promise.all([
     getOutline(),
+    listPractice(),
     useDb()
       .select({ id: tables.questions.id, updatedAt: tables.questions.updatedAt })
       .from(tables.questions)
@@ -21,6 +22,8 @@ export default defineEventHandler(async (event) => {
       for (const q of cat.questions) urls.push({ loc: q.path, lastmod: updated.get(q.id) })
     }
   }
+  // 默写练习放最后：列表页和每道练习
+  if (practice.length) urls.push({ loc: '/practice' }, ...practice.map((p) => ({ loc: `/practice${p.path}` })))
 
   const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const body = urls

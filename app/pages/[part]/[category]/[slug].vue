@@ -99,6 +99,7 @@ watch(() => question.value?.id, remember)
         <DocsQuestionBody
           :html="question.html"
           :runnable="RUNNABLE_CATEGORIES.has(question.category.slug)"
+          :question-id="question.id"
           :inert="hidden"
           :aria-hidden="hidden"
         />

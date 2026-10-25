@@ -103,6 +103,229 @@ function formatValue(value, top) {
 }
 `
 
+/**
+ * 默写练习的测试工具：test / expect（常用的 Jest 写法）、delay、fn（记录调用的假函数），run 依次执行全部用例，
+ * 每条用例的结果交给 report。不依赖浏览器，单元测试和 npm run practice:check 在 Node 里用同一份
+ */
+export const HARNESS_SOURCE = String.raw`
+function createPractice(formatValue, report, lineOf, beforeEach) {
+  var tests = []
+  var TEST_TIMEOUT = 3000
+  var show = function (v) { return formatValue(v, false) }
+
+  function fail(message) {
+    var error = new Error(message)
+    error.name = 'AssertionError'
+    throw error
+  }
+
+  /** 深度相等，规则和 Jest 的 toEqual 一样：值为 undefined 的属性当作没有，NaN 等于 NaN */
+  function equals(a, b, seen) {
+    if (Object.is(a, b)) return true
+    if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+    if (Object.prototype.toString.call(a) !== Object.prototype.toString.call(b)) return false
+    seen = seen || []
+    for (var s = 0; s < seen.length; s++) if (seen[s][0] === a && seen[s][1] === b) return true
+    seen.push([a, b])
+    if (a instanceof Date) return a.getTime() === b.getTime()
+    if (a instanceof RegExp) return String(a) === String(b)
+    if (a instanceof Map || a instanceof Set) {
+      if (a.size !== b.size) return false
+      var aa = Array.from(a), bb = Array.from(b)
+      return aa.every(function (x) { return bb.some(function (y) { return equals(x, y, seen) }) })
+    }
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false
+      for (var i = 0; i < a.length; i++) if (!equals(a[i], b[i], seen)) return false
+      return true
+    }
+    var ka = Object.keys(a).filter(function (k) { return a[k] !== undefined })
+    var kb = Object.keys(b).filter(function (k) { return b[k] !== undefined })
+    if (ka.length !== kb.length) return false
+    return ka.every(function (k) { return Object.prototype.hasOwnProperty.call(b, k) && equals(a[k], b[k], seen) })
+  }
+
+  function thrownBy(fn) {
+    if (typeof fn !== 'function') fail('toThrow 要传一个函数，比如 expect(() => f()).toThrow()')
+    try {
+      var result = fn()
+    } catch (error) {
+      return { error: error }
+    }
+    if (result && typeof result.then === 'function') {
+      fail('函数返回的是 Promise，没有同步抛错；异步函数请用 await expect(promise).rejects.toThrow()')
+    }
+    return null
+  }
+
+  function matchesError(error, expected) {
+    if (expected === undefined) return true
+    var message = error && error.message !== undefined ? String(error.message) : String(error)
+    if (typeof expected === 'string') return message.indexOf(expected) !== -1
+    if (expected instanceof RegExp) return expected.test(message)
+    if (typeof expected === 'function') return error instanceof expected
+    return false
+  }
+
+  function matchers(actual, negate) {
+    function check(pass, message, negMessage) {
+      if (negate ? pass : !pass) fail(negate ? negMessage : message)
+    }
+    function calls() {
+      if (!actual || !Array.isArray(actual.calls)) fail('只能对 fn() 创建的假函数检查调用情况')
+      return actual.calls
+    }
+    return {
+      toBe: function (expected) {
+        check(Object.is(actual, expected), '期望 ' + show(expected) + '，实际是 ' + show(actual), '期望不是 ' + show(expected))
+      },
+      toEqual: function (expected) {
+        check(equals(actual, expected), '期望 ' + show(expected) + '，实际是 ' + show(actual), '期望不等于 ' + show(expected))
+      },
+      toBeTruthy: function () { check(!!actual, '期望是真值，实际是 ' + show(actual), '期望是假值，实际是 ' + show(actual)) },
+      toBeFalsy: function () { check(!actual, '期望是假值，实际是 ' + show(actual), '期望是真值，实际是 ' + show(actual)) },
+      toBeNull: function () { check(actual === null, '期望是 null，实际是 ' + show(actual), '期望不是 null') },
+      toBeUndefined: function () { check(actual === undefined, '期望是 undefined，实际是 ' + show(actual), '期望不是 undefined') },
+      toBeDefined: function () { check(actual !== undefined, '期望有值，实际是 undefined', '期望是 undefined，实际是 ' + show(actual)) },
+      toBeGreaterThan: function (n) { check(actual > n, '期望大于 ' + n + '，实际是 ' + show(actual), '期望不大于 ' + n + '，实际是 ' + show(actual)) },
+      toBeGreaterThanOrEqual: function (n) { check(actual >= n, '期望大于等于 ' + n + '，实际是 ' + show(actual), '期望小于 ' + n + '，实际是 ' + show(actual)) },
+      toBeLessThan: function (n) { check(actual < n, '期望小于 ' + n + '，实际是 ' + show(actual), '期望不小于 ' + n + '，实际是 ' + show(actual)) },
+      toBeLessThanOrEqual: function (n) { check(actual <= n, '期望小于等于 ' + n + '，实际是 ' + show(actual), '期望大于 ' + n + '，实际是 ' + show(actual)) },
+      toContain: function (item) {
+        var has = typeof actual === 'string' ? actual.indexOf(item) !== -1 : !!actual && Array.prototype.some.call(actual, function (x) { return Object.is(x, item) })
+        check(has, '期望包含 ' + show(item) + '，实际是 ' + show(actual), '期望不包含 ' + show(item))
+      },
+      toHaveLength: function (n) {
+        var len = actual == null ? undefined : actual.length
+        check(len === n, '期望长度是 ' + n + '，实际是 ' + show(len), '期望长度不是 ' + n)
+      },
+      toMatch: function (pattern) {
+        var ok = typeof actual === 'string' && (pattern instanceof RegExp ? pattern.test(actual) : actual.indexOf(pattern) !== -1)
+        check(ok, '期望匹配 ' + String(pattern) + '，实际是 ' + show(actual), '期望不匹配 ' + String(pattern))
+      },
+      toBeInstanceOf: function (C) {
+        check(actual instanceof C, '期望是 ' + (C && C.name) + ' 的实例，实际是 ' + show(actual), '期望不是 ' + (C && C.name) + ' 的实例')
+      },
+      toThrow: function (expected) {
+        var thrown = thrownBy(actual)
+        if (negate) {
+          if (thrown) fail('期望不抛错，实际抛出了 ' + show(thrown.error))
+          return
+        }
+        if (!thrown) fail('期望抛出错误，但没有抛')
+        if (!matchesError(thrown.error, expected)) fail('期望抛出 ' + show(expected) + '，实际抛出 ' + show(thrown.error))
+      },
+      toHaveBeenCalled: function () {
+        var n = calls().length
+        check(n > 0, '期望被调用过，实际一次都没调用', '期望没被调用，实际调用了 ' + n + ' 次')
+      },
+      toHaveBeenCalledTimes: function (times) {
+        var n = calls().length
+        check(n === times, '期望调用 ' + times + ' 次，实际调用了 ' + n + ' 次', '期望调用次数不是 ' + times)
+      },
+      toHaveBeenCalledWith: function () {
+        var args = Array.prototype.slice.call(arguments)
+        var list = calls()
+        check(
+          list.some(function (c) { return equals(c, args) }),
+          '期望用 ' + show(args) + ' 调用过，实际的调用是 ' + show(list),
+          '期望没有用 ' + show(args) + ' 调用过',
+        )
+      },
+    }
+  }
+
+  function expect(actual) {
+    var api = matchers(actual, false)
+    api.not = matchers(actual, true)
+    // await expect(promise).resolves.toBe(1) / .rejects.toThrow('x')
+    api.resolves = {}
+    api.rejects = {}
+    Object.keys(api).forEach(function (name) {
+      if (name === 'not' || name === 'resolves' || name === 'rejects') return
+      api.resolves[name] = function () {
+        var args = arguments
+        return Promise.resolve(actual).then(
+          function (value) { matchers(value, false)[name].apply(null, args) },
+          function (reason) { fail('期望 Promise 成功，实际被拒绝：' + show(reason)) },
+        )
+      }
+      api.rejects[name] = function () {
+        var args = arguments
+        return Promise.resolve(actual).then(
+          function (value) { fail('期望 Promise 被拒绝，实际成功了，结果是 ' + show(value)) },
+          function (reason) {
+            var target = name === 'toThrow' ? function () { throw reason } : reason
+            matchers(target, false)[name].apply(null, args)
+          },
+        )
+      }
+    })
+    return api
+  }
+
+  /** 等一会儿：delay(100) 100ms 后成功；delay(100, 'a') 返回 'a'；delay(100, 'e', true) 100ms 后以 Error('e') 失败 */
+  function delay(ms, value, reject) {
+    return new Promise(function (resolve, rejectFn) {
+      setTimeout(function () { reject ? rejectFn(value instanceof Error ? value : new Error(String(value))) : resolve(value) }, ms)
+    })
+  }
+
+  /** 假函数：记下每次调用的参数（spy.calls），可以传一个实现 */
+  function fn(impl) {
+    var spy = function () {
+      var args = Array.prototype.slice.call(arguments)
+      spy.calls.push(args)
+      return impl ? impl.apply(this, args) : undefined
+    }
+    spy.calls = []
+    return spy
+  }
+
+  function test(name, body, timeout) {
+    tests.push({ name: String(name), body: body, timeout: timeout || TEST_TIMEOUT })
+  }
+
+  function describeError(error) {
+    if (error && error.name === 'AssertionError') return { message: error.message, line: lineOf(error) }
+    if (error && typeof error === 'object' && 'message' in error) return { message: (error.name || 'Error') + ': ' + error.message, line: lineOf(error) }
+    return { message: '抛出了 ' + show(error), line: null }
+  }
+
+  function runOne(t) {
+    var timer
+    var timeout = new Promise(function (resolve, reject) {
+      timer = setTimeout(function () { reject(new Error('超过 ' + t.timeout + 'ms 还没结束（Promise 一直没有 resolve？）')) }, t.timeout)
+    })
+    return Promise.race([Promise.resolve().then(function () { return t.body() }), timeout]).then(
+      function () { clearTimeout(timer) },
+      function (error) { clearTimeout(timer); throw error },
+    )
+  }
+
+  async function run() {
+    var passed = 0
+    for (var i = 0; i < tests.length; i++) {
+      var started = Date.now()
+      var error = null
+      // 每条用例重新计循环次数：前一条死循环被拦下后，后面的用例照常跑
+      if (beforeEach) beforeEach()
+      try {
+        await runOne(tests[i])
+      } catch (e) {
+        error = describeError(e)
+      }
+      if (!error) passed++
+      report({ index: i, name: tests[i].name, ok: !error, ms: Date.now() - started, error: error })
+    }
+    report({ done: true, passed: passed, total: tests.length })
+    return { passed: passed, total: tests.length }
+  }
+
+  return { test: test, expect: expect, delay: delay, fn: fn, run: run }
+}
+`
+
 const RUNNER_SOURCE = String.raw`
 (function () {
   'use strict'
@@ -121,6 +344,7 @@ const RUNNER_SOURCE = String.raw`
   var nativeClearInterval = window.clearInterval
 
   /*FORMAT*/
+  /*HARNESS*/
 
   function post(type, data) {
     parentWin.postMessage({ source: 'mianbook-runner', runId: runId, type: type, data: data }, '*')
@@ -235,6 +459,20 @@ const RUNNER_SOURCE = String.raw`
   window.cancelAnimationFrame = function (id) { window.clearTimeout(id) }
 
   window.__mute = function (on) { muted = !!on }
+  // 一边遍历一边往 Set、Map 里加东西会一直遍历下去（比如响应式系统里 effect 把自己又加回依赖），forEach 也算进循环次数
+  ;[Set.prototype, Map.prototype].forEach(function (proto) {
+    var original = proto.forEach
+    Object.defineProperty(proto, 'forEach', {
+      value: function (callback, thisArg) {
+        return original.call(this, function () {
+          window.__loopGuard()
+          return callback.apply(thisArg, arguments)
+        })
+      },
+      writable: true,
+      configurable: true,
+    })
+  })
   window.__loopGuard = function () {
     if (++loops > LOOP_LIMIT) throw new RangeError('循环超过 ' + LOOP_LIMIT / 10000 + ' 万次，可能是死循环，已经停下')
   }
@@ -247,6 +485,8 @@ const RUNNER_SOURCE = String.raw`
     emit('result', formatValue(value, false))
     return value
   }
+  // 默写练习：测试代码里的 test、expect 等从这里取，每条用例的结果发给题目页
+  window.__practice = createPractice(formatValue, function (result) { post('test', result) }, lineOf, function () { loops = 0 })
   window.__done = function () {
     evaluated = true
     settle()
@@ -324,7 +564,7 @@ body { margin: 0; padding: 14px 16px; font: 14px/1.6 -apple-system, BlinkMacSyst
 </head>
 <body>
 <div id="app"></div>
-<script>${RUNNER_SOURCE.replace('/*FORMAT*/', FORMAT_SOURCE)}</script>
+<script>${RUNNER_SOURCE.replace('/*FORMAT*/', () => FORMAT_SOURCE).replace('/*HARNESS*/', () => HARNESS_SOURCE)}</script>
 </body>
 </html>
 `

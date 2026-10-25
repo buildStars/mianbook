@@ -9,8 +9,11 @@ export default defineNuxtConfig({
 
   nitro: {
     ...(process.env.HANDBOOK_TEST_BUILD ? { output: { dir: '.output-test' } } : {}),
-    // 写作规范打包进服务端，后台 AI 写题时作为提示词的一部分
-    serverAssets: [{ baseName: 'templates', dir: fileURLToPath(new URL('./templates', import.meta.url)) }],
+    // 写作规范打包进服务端，后台 AI 写题时作为提示词的一部分；默写练习的题目文件（practice/）也打包进去
+    serverAssets: [
+      { baseName: 'templates', dir: fileURLToPath(new URL('./templates', import.meta.url)) },
+      { baseName: 'practice', dir: fileURLToPath(new URL('./practice', import.meta.url)) },
+    ],
   },
 
   modules: ['@nuxtjs/color-mode', '@element-plus/nuxt', 'nuxt-auth-utils'],

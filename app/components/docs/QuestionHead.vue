@@ -45,6 +45,10 @@ const categoryLink = computed(() => '/' + props.question.part.slug + '/' + props
         <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" /></svg>
         AI 模拟面试
       </button>
+      <NuxtLink v-if="question.practice" :to="`/practice${question.path}`" class="btn btn-sm" title="只给函数签名，自己写出来再跑测试用例">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.83 2.83 0 0 0-4-4L4 16zM13.5 6.5l4 4" /></svg>
+        默写练习
+      </NuxtLink>
       <button
         type="button"
         role="switch"

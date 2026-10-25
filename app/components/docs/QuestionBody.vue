@@ -6,10 +6,13 @@ const props = defineProps<{
   html: string
   /** 代码块可以在浏览器里运行（手写题），见 app/utils/code-run.ts */
   runnable?: boolean
+  /** 运行代码时记一条学习事件 */
+  questionId?: number
 }>()
 
 const root = ref<HTMLElement | null>(null)
 const nuxtApp = useNuxtApp()
+const { track } = useLearningEvents()
 
 /** 正文是服务端渲染的 HTML，这里用事件委托处理复制按钮和站内链接 */
 async function onClick(event: MouseEvent) {
@@ -62,6 +65,7 @@ function mountRunners() {
     const vnode = h(CodeRunner, {
       block,
       register: (get: () => string) => current.set(block, get),
+      onRun: () => props.questionId && track({ type: 'code_run', questionId: props.questionId }),
       prelude: () => blocks.slice(0, i).map((b) => current.get(b)?.() ?? b.querySelector('pre')?.textContent ?? ''),
     })
     vnode.appContext = nuxtApp.vueApp._context

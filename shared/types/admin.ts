@@ -1,6 +1,6 @@
 /** 管理后台用到的接口类型 */
 
-export type AiKind = 'interview' | 'report' | 'resume' | 'author' | 'ask' | 'agent'
+export type AiKind = 'interview' | 'report' | 'resume' | 'author' | 'ask' | 'agent' | 'practice'
 
 /** 某个功能的 AI 调用性能（近 7 天）；延迟单位毫秒，只统计正常结束的调用 */
 export interface AiPerfRow {

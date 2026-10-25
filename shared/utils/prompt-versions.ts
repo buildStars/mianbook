@@ -7,6 +7,7 @@ import type { AiKind } from '../types/admin'
 export const PROMPT_VERSIONS: Record<AiKind, string> = {
   interview: 'interview-v1',
   ask: 'ask-v1',
+  practice: 'practice-v1',
   agent: 'agent-v1',
   report: 'report-v1',
   resume: 'resume-v1',

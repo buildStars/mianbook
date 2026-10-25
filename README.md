@@ -4,6 +4,7 @@
 
 - **阅读端**：分类目录、题目详解（代码高亮、提示块、折叠追问、本页目录）、中文搜索、自测模式、深色模式；每道题底部可以纠错和反馈（不用登录，按 IP 限频）
 - **手写题在线运行**：手写题的代码块可以直接在浏览器里运行、改了再跑，输出格式和 Node 一致；自动带上同一道题前面代码块里定义的函数，操作页面的代码（如虚拟 DOM）显示页面预览。代码在沙箱 iframe 里执行（独立的源、不能联网，死循环和超过 10 秒会自动停下），实现见 `shared/utils/code-prep.ts` 和 `server/utils/code-runner-page.ts`
+- **默写练习**：手写题的练习模式（`/practice`），只给要求和函数签名，在浏览器里的代码编辑器（CodeMirror）里自己写实现，跑测试用例看哪些通过（失败信息写明期望和实际、出错的行号）；通过或放弃后再看参考答案，登录后可以让 AI 面试官点评代码。练习文件在 `practice/` 下，和题目路径一一对应，写法见 `templates/practice-guide.md`
 - **学习记录**：每道题标记"不会 / 模糊 / 掌握"、收藏、笔记；登录后存在数据库里，多设备同步；未登录时先存在本地，登录后自动合并
 - **AI 模拟面试官**：用自己的话作答，AI 对照题库参考答案打分（0～10）、指出遗漏和错误，再追问，最多 3 轮；点评流式输出，低分题自动加入复习
 - **Agent 面试官**：写下面试目标（岗位、重点方向），AI 面试官自己调用工具：先看你的学习记录和薄弱点，从题库里找题，每次回答后查参考答案打分，再决定追问还是换题、加难度还是降难度，得分写进复习计划，问满后写总结。页面上能看到它每一步调用了什么工具
@@ -127,6 +128,7 @@ npm run db:start
 | `npm run db:export` | 把数据库里的题目导出到 `content/`，方便备份和用 Git 管理 |
 | `npm run db:rerender` | 修改了 Markdown 渲染规则后，重新生成所有题目的 HTML |
 | `npm run content:check` | 检查 `content/` 里题目的格式（结构、链接、表格等），可以只传分类名，如 `npm run content:check -- react` |
+| `npm run practice:check` | 检查 `practice/` 里的默写练习：格式、参考答案能通过全部测试、起始代码通过不了，可以只传文件名的一部分，如 `npm run practice:check -- 13-promisify`；写法见 `templates/practice-guide.md` |
 | `npm run eval:retrieval` | 评测问手册的检索效果（见下面"问手册是怎么实现的"），加 `-- --verbose` 看没找回来的问题排在前面的是什么、重排让哪些问题变好变差，`-- --candidates=20` 改重排的候选块数 |
 | `npm run typecheck` | 用 vue-tsc 检查前端、服务端、`shared/` 和 `nuxt.config.ts` 的类型 |
 | `npm run db:generate` | 修改 `server/db/schema.ts` 后生成迁移文件 |

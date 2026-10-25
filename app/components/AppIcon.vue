@@ -12,6 +12,7 @@ const PATHS = {
   admin: 'M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z',
   logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  code: 'm8 6-6 6 6 6M16 6l6 6-6 6M14 4l-4 16',
   book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7M8 11h5',
   theme: 'M12 21a9 9 0 1 0 0-18v18z',
   chevronRight: 'm9 6 6 6-6 6',

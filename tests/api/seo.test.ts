@@ -39,8 +39,9 @@ describe('搜索引擎和分享卡片', () => {
     expect(text.indexOf('Allow: /api/outline')).toBeLessThan(text.indexOf('Disallow: /api/'))
   })
 
-  it('sitemap.xml 列出首页、功能入口、分类专题页和全部已发布题目', async () => {
+  it('sitemap.xml 列出首页、功能入口、分类专题页、全部已发布题目和默写练习', async () => {
     const outline = await (await fetch(`${baseUrl()}/api/outline`)).json()
+    const practice: { path: string }[] = await (await fetch(`${baseUrl()}/api/practice`)).json()
     // 每个分类专题页排在它的题目前面
     const paths: string[] = outline.flatMap((p: any) =>
       p.categories.flatMap((c: any) => [`/${p.slug}/${c.slug}`, ...c.questions.map((q: any) => q.path)]),
@@ -50,7 +51,8 @@ describe('搜索引擎和分享卡片', () => {
     const xml = await res.text()
     const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1])
     expect(locs.slice(0, 3)).toEqual([`${SITE}/`, `${SITE}/mock`, `${SITE}/ask`])
-    expect(locs.slice(3)).toEqual(paths.map((p) => SITE + p))
+    const practicePaths = practice.length ? ['/practice', ...practice.map((p) => `/practice${p.path}`)] : []
+    expect(locs.slice(3)).toEqual([...paths, ...practicePaths].map((p) => SITE + p))
     expect(xml).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/)
   })
 

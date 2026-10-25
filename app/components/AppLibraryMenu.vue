@@ -79,6 +79,9 @@ const isCurrent = (path: string) => route.path === path || route.path.startsWith
             <span class="lib-continue-title">No.{{ String(last.num).padStart(2, '0') }} {{ plainTitle(last.title) }}</span>
             <AppIcon name="arrowRight" :size="15" />
           </NuxtLink>
+          <NuxtLink to="/practice" class="lib-practice" @click="close">
+            <AppIcon name="code" :size="15" />默写练习：手写题自己写、跑测试
+          </NuxtLink>
           <span class="lib-hint">共 {{ total }} 道题。点分类可以看全部题目和一句话回答</span>
         </div>
       </div>
@@ -269,6 +272,14 @@ const isCurrent = (path: string) => route.path === path || route.path.startsWith
 }
 
 .lib-continue:hover .lib-continue-title {
+  color: var(--c-brand);
+}
+
+.lib-practice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
   color: var(--c-brand);
 }
 

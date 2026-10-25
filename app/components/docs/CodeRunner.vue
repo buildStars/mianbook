@@ -9,6 +9,7 @@ const props = defineProps<{
   /** 同一道题前面可运行代码块的当前代码（改过的用改过的） */
   prelude: () => string[]
   register: (get: () => string) => void
+  onRun?: () => void
 }>()
 
 const head = props.block.querySelector<HTMLElement>('.code-head')!
@@ -34,12 +35,9 @@ const previewHeight = ref(0)
 const frameBox = ref<HTMLElement | null>(null)
 
 const TIMEOUT = 10_000
-let frame: HTMLIFrameElement | null = null
-let timer: ReturnType<typeof setTimeout> | undefined
+const sandbox = useSandbox()
 let seq = 0
-let source = ''
 let blockStartLine = 1
-let started = 0
 let hadError = false
 
 const statusText = computed(() => {
@@ -50,16 +48,6 @@ const statusText = computed(() => {
   return `完成 · ${elapsed.value < 1000 ? `${elapsed.value} 毫秒` : `${(elapsed.value / 1000).toFixed(1)} 秒`}`
 })
 
-/** 沙箱带来的限制，报错后面补一句说明 */
-function explain(text: string) {
-  if (text.startsWith('SecurityError')) return `${text}（运行环境是隔离的沙箱，访问嵌套 iframe 这类跨页面的操作会被浏览器拦下）`
-  if (/Failed to fetch|NetworkError|Content Security Policy/.test(text)) return `${text}（运行环境不能联网）`
-  if (/^ReferenceError: (fs|require|process|module|Buffer|__dirname|__filename) is not defined/.test(text)) {
-    return `${text}（这是 Node.js 的写法，浏览器里没有 fs、require、process 这些）`
-  }
-  return text
-}
-
 const emptyText = computed(() => {
   if (preview.value) return '没有打印输出，页面效果看下面的预览'
   if (onlyDeclarations.value && status.value === 'done') return '这段只定义了函数和变量，没有输出。运行后面的代码块时会自动带上这里的定义'
@@ -67,7 +55,7 @@ const emptyText = computed(() => {
 })
 
 function push(level: Level, text: string, at?: string) {
-  lines.value.push({ level, text: level === 'error' ? explain(text) : text, at })
+  lines.value.push({ level, text: level === 'error' ? explainRunError(text) : text, at })
 }
 
 /** 运行页报的是整段代码里的行号，换算成这个代码块里的行号；在前面带上的定义里出错的单独说明 */
@@ -78,38 +66,17 @@ function where(line: number | null | undefined) {
 }
 
 function teardown() {
-  clearTimeout(timer)
-  window.removeEventListener('message', onMessage)
-  frame?.remove()
-  frame = null
+  sandbox.stop()
   preview.value = false
-}
-
-function onMessage(e: MessageEvent) {
-  if (!frame || e.source !== frame.contentWindow || e.data?.source !== 'mianbook-runner') return
-  const { type, data, runId } = e.data
-  if (type === 'ready') {
-    started = performance.now()
-    frame.contentWindow!.postMessage({ type: 'run', runId: seq, code: source }, '*')
-    return
-  }
-  if (runId !== seq) return
-  if (type === 'log') push(data.level, data.text)
-  else if (type === 'clear') lines.value = []
-  else if (type === 'error') {
-    hadError = true
-    push('error', data.message, where(data.line))
-  } else if (type === 'idle') finish(data.dom)
-  else if (type === 'resize') previewHeight.value = Math.min(Math.max(data.height, 48), 600)
 }
 
 function finish(dom: { height: number } | null) {
   if (status.value !== 'running') return
-  clearTimeout(timer)
-  elapsed.value = Math.round(performance.now() - started)
+  elapsed.value = sandbox.elapsed()
   status.value = hadError ? 'error' : 'done'
   // 有页面预览时留着 iframe（里面的按钮还能点），没有就直接删掉
   if (dom) {
+    sandbox.settle()
     preview.value = true
     previewHeight.value = Math.min(Math.max(dom.height, 48), 600)
   } else teardown()
@@ -118,6 +85,7 @@ function finish(dom: { height: number } | null) {
 async function run() {
   teardown()
   const id = ++seq
+  props.onRun?.()
   lines.value = []
   hadError = false
   preludeCount.value = 0
@@ -135,24 +103,31 @@ async function run() {
     status.value = 'error'
     return
   }
-  source = prepared.source
   blockStartLine = prepared.blockStartLine
   preludeCount.value = prepared.preludeCount
   onlyDeclarations.value = prepared.onlyDeclarations
 
-  frame = document.createElement('iframe')
-  frame.setAttribute('sandbox', 'allow-scripts')
-  frame.setAttribute('title', '代码运行结果的页面预览')
-  frame.className = 'code-frame'
-  frame.src = '/sandbox/runner'
-  window.addEventListener('message', onMessage)
   await nextTick()
-  frameBox.value?.appendChild(frame)
-  timer = setTimeout(() => {
-    if (status.value !== 'running') return
-    teardown()
-    status.value = 'timeout'
-  }, TIMEOUT)
+  if (!frameBox.value) return
+  sandbox.run(
+    prepared.source,
+    frameBox.value,
+    {
+      log: (level, text) => push(level, text),
+      clear: () => (lines.value = []),
+      error: (message, line) => {
+        hadError = true
+        push('error', message, where(line))
+      },
+      idle: finish,
+      resize: (height) => (previewHeight.value = Math.min(Math.max(height, 48), 600)),
+      timeout: () => {
+        preview.value = false
+        if (status.value === 'running') status.value = 'timeout'
+      },
+    },
+    TIMEOUT,
+  )
 }
 
 function stop() {
@@ -195,7 +170,6 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onBeforeUnmount(() => {
-  teardown()
   pre.style.display = ''
 })
 </script>

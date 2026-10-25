@@ -132,6 +132,7 @@ export async function getQuestionDetail(path: string): Promise<QuestionDetail | 
     prev: link(located.prev),
     next: link(located.next),
     related,
+    practice: await hasPractice(path),
     updatedAt: row.updatedAt.toISOString(),
   }
 }
@@ -147,10 +148,11 @@ export async function getCategoryDetail(partSlug: string, categorySlug: string):
     .where(inArray(tables.questions.id, cat.questions.map((q) => q.id)))
   const byId = new Map(rows.map((r) => [r.id, r]))
   const latest = Math.max(0, ...rows.map((r) => r.updatedAt.getTime()))
+  const practice = await Promise.all(cat.questions.map((q) => hasPractice(q.path)))
   return {
     part: { slug: part.slug, title: part.title },
     category: { id: cat.id, slug: cat.slug, title: cat.title },
-    questions: cat.questions.map((q) => ({
+    questions: cat.questions.map((q, i) => ({
       id: q.id,
       num: q.num,
       title: q.title,
@@ -159,6 +161,7 @@ export async function getCategoryDetail(partSlug: string, categorySlug: string):
       tags: byId.get(q.id)?.tags ?? [],
       // 卡片里只放两行，停在分号上读着像没说完，换成省略号
       summary: answerSummary(byId.get(q.id)?.contentMd ?? '').replace(/；$/, '…'),
+      practice: practice[i]!,
     })),
     siblings: part.categories
       .filter((c) => c.id !== cat.id)

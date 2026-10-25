@@ -268,7 +268,7 @@ export const events = mysqlTable(
     userId: int('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    /** read 阅读一道题、reveal 自测模式里查看答案、voice 用语音作答 */
+    /** read 阅读一道题、reveal 自测模式里查看答案、voice 用语音作答、code_run 运行题目里的代码、practice_pass 默写练习全部通过 */
     type: varchar('type', { length: 16 }).notNull(),
     questionId: int('question_id').references(() => questions.id, { onDelete: 'cascade' }),
     /** read、voice 是秒数 */

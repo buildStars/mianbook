@@ -1,13 +1,14 @@
 import type { AiKind } from '../types/admin'
 
 /** 用到 AI 的功能，顺序就是后台列表里的顺序 */
-export const AI_KINDS: AiKind[] = ['interview', 'agent', 'ask', 'report', 'resume', 'author']
+export const AI_KINDS: AiKind[] = ['interview', 'agent', 'ask', 'practice', 'report', 'resume', 'author']
 
 /** 后台显示的功能名 */
 export const AI_KIND_LABELS: Record<AiKind, string> = {
   interview: 'AI 单题面试',
   agent: 'Agent 面试',
   ask: '问手册',
+  practice: '默写点评',
   report: '模拟面试总结',
   resume: '简历出题',
   author: '后台 AI 写题',

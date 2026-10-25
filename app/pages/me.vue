@@ -41,6 +41,7 @@ const groups = computed<{ title: string; rows: Row[] }[]>(() => [
       { to: '/progress', icon: 'progress', title: '学习进度', desc: '题目地图、薄弱点分析和复习清单', extra: ready.value ? `${pct.value}%` : '' },
       { to: '/favorites', icon: 'star', title: '我的收藏', desc: '收藏过的题，按分类放好', extra: starred.value.length || '' },
       { to: '/favorites?tab=notes', icon: 'note', title: '我的笔记', desc: '在题目页写下的笔记，最近改的在前', extra: noted.value.length || '' },
+      { to: '/practice', icon: 'code', title: '默写练习', desc: '手写题只给函数签名，自己写完跑测试用例' },
       { to: '/review', icon: 'review', title: '今日复习', desc: '按遗忘规律安排今天该复习的题', extra: due.value ? `${due.value} 道` : '', login: true },
       { to: '/report', icon: 'report', title: '学习周报', desc: '这周学了多少、哪些题最卡', login: true },
     ],

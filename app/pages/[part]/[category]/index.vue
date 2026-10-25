@@ -63,6 +63,7 @@ const shown = computed(() => (level.value ? d.value.questions.filter((q) => q.di
 const statusOf = (id: number) => records.value[id]?.status ?? null
 const mastered = computed(() => d.value.questions.filter((q) => statusOf(q.id) === 'mastered').length)
 /** 学过的人从第一道没掌握的题接着来，没学过从第 1 题开始 */
+const practiceCount = computed(() => d.value.questions.filter((q) => q.practice).length)
 const next = computed(() => (mastered.value ? d.value.questions.find((q) => statusOf(q.id) !== 'mastered') : null) ?? d.value.questions[0])
 </script>
 
@@ -95,6 +96,11 @@ const next = computed(() => (mastered.value ? d.value.questions.find((q) => stat
           只考这一类的模拟面试
         </NuxtLink>
       </div>
+      <NuxtLink v-if="practiceCount" to="/practice" class="practice-cta">
+        <AppIcon name="code" :size="18" />
+        <span><b>{{ practiceCount }} 道可以默写练习</b>：只给函数签名，自己在浏览器里写实现、跑测试用例</span>
+        <AppIcon name="arrowRight" :size="16" class="practice-arrow" />
+      </NuxtLink>
     </header>
 
     <div v-if="levels.length > 1" class="filter" role="group" aria-label="按难度筛选">
@@ -114,6 +120,7 @@ const next = computed(() => (mastered.value ? d.value.questions.find((q) => stat
             <span class="q-meta">
               <DifficultyBadge :value="q.difficulty" />
               <span v-for="t in q.tags" :key="t" class="tag">{{ t }}</span>
+              <span v-if="q.practice" class="tag practice-tag">可默写</span>
             </span>
           </span>
           <span
@@ -196,6 +203,38 @@ const next = computed(() => (mastered.value ? d.value.questions.find((q) => stat
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 24px;
+}
+
+.practice-cta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 640px;
+  margin-top: 20px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--c-brand) 22%, transparent);
+  border-radius: var(--r-lg);
+  background: var(--c-brand-softer);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--c-text-1);
+}
+
+.practice-cta b {
+  color: var(--c-brand);
+}
+
+.practice-cta .app-icon {
+  color: var(--c-brand);
+}
+
+.practice-arrow {
+  margin-left: auto;
+}
+
+.practice-tag {
+  background: var(--c-brand-soft);
+  color: var(--c-brand);
 }
 
 .filter {

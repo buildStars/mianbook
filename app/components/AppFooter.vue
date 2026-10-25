@@ -24,6 +24,7 @@ const siteName = useRuntimeConfig().public.siteName
           <p class="col-title">学习</p>
           <NuxtLink to="/review">今日复习</NuxtLink>
           <NuxtLink to="/mock">模拟面试</NuxtLink>
+          <NuxtLink to="/practice">默写练习</NuxtLink>
           <NuxtLink to="/ask">问手册</NuxtLink>
           <NuxtLink to="/connect">接入 AI 工具</NuxtLink>
           <button type="button" @click="searchOpen = true">搜索题目</button>

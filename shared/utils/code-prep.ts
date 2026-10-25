@@ -188,6 +188,51 @@ function syntaxError(error: unknown): { message: string; line?: number } {
   return { message: `语法错误：${message}`, line: e.loc?.line }
 }
 
+/** 默写练习里测试代码能直接用的工具，见 server/utils/code-runner-page.ts 的 HARNESS_SOURCE */
+export const PRACTICE_GLOBALS = ['test', 'expect', 'delay', 'fn'] as const
+
+/**
+ * 默写练习：用户的代码放最前面（报错行号就是编辑器里的行号），去掉 export、加循环保护；
+ * 测试代码包在一个块里，test、expect 等从 __practice 取（用户代码里有同名变量也不冲突），最后依次跑完全部用例
+ */
+export function preparePractice(code: string, tests: string): { ok: true; source: string } | { ok: false; message: string; line?: number } {
+  let ast: AstNode
+  try {
+    ast = parseModule(code)
+  } catch (error) {
+    return { ok: false, ...syntaxError(error) }
+  }
+  const imported = (ast.body as AstNode[]).find((s) => s.type === 'ImportDeclaration')
+  if (imported) return { ok: false, message: '默写练习里不能用 import，运行环境没有其他模块', line: imported.loc.start.line }
+  const edits: Edit[] = []
+  for (const statement of ast.body as AstNode[]) {
+    const edit = exportEdits(statement)
+    if (edit) edits.push(edit)
+  }
+  loopGuards(ast, edits)
+
+  let testAst: AstNode
+  try {
+    testAst = parseModule(tests)
+  } catch (error) {
+    return { ok: false, message: `测试用例本身有${syntaxError(error).message}，请到题目页反馈` }
+  }
+  const testEdits: Edit[] = []
+  loopGuards(testAst, testEdits)
+
+  return {
+    ok: true,
+    source: [
+      applyEdits(code, edits),
+      `;{ const { ${PRACTICE_GLOBALS.join(', ')} } = __practice;`,
+      applyEdits(tests, testEdits),
+      '}',
+      ';await __practice.run();',
+      ';__done();',
+    ].join('\n'),
+  }
+}
+
 export function prepareRun(code: string, previous: string[] = []): PrepareResult {
   let ast: AstNode
   const comments: Comment[] = []

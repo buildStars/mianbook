@@ -20,7 +20,7 @@ const tabs = computed(() => [
   { to: libraryPath.value, label: '题库', icon: 'book', active: false },
   { to: '/review', label: '复习', icon: 'review', active: route.path === '/review', badge: due.value },
   { to: '/mock', label: '模拟面试', icon: 'mock', active: route.path.startsWith('/mock') },
-  { to: '/me', label: '我的', icon: 'me', active: MINE.includes(route.path) },
+  { to: '/me', label: '我的', icon: 'me', active: MINE.includes(route.path) || route.path.startsWith('/practice') },
 ])
 </script>
 
