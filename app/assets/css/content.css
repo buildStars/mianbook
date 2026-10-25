@@ -606,4 +606,20 @@
     margin-right: -4px;
     margin-left: -4px;
   }
+
+  /* 能运行的代码块头部多了"编辑""运行"两个按钮，手机上放不下：去掉三个圆点，"复制"只留图标（读屏仍读 aria-label） */
+  .doc-content .code-block:has(.code-run) .code-head {
+    gap: 6px;
+    padding-left: 14px;
+  }
+
+  .doc-content .code-block:has(.code-run) .code-dots {
+    display: none;
+  }
+
+  .doc-content .code-block:has(.code-run) .code-copy {
+    gap: 0;
+    padding: 0 8px;
+    font-size: 0;
+  }
 }

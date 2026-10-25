@@ -73,7 +73,7 @@ Markdown 渲染时（`server/utils/markdown.ts`）会按题目模板生成结构
 | --- | --- | --- |
 | `::: tip 一句话回答` | `.custom-block.answer` | 白色答案卡，左侧蓝条、右上角引号 |
 | `## 详细解析` 等二级标题 | `section.doc-section[data-kind]` | 宋体章节标题，自动编号 01、02 …… |
-| ```` ```js ```` 代码块 | `.code-block > .code-head + pre` | 深色窗口，顶栏有语言名和复制按钮 |
+| ```` ```js ```` 代码块 | `.code-block > .code-head + pre` | 深色窗口，顶栏有语言名和复制按钮。手写题的 JS 代码块在浏览器端再加"编辑""运行"（绿色）按钮，输出面板接在代码下面（同样深色，警告黄、报错红、返回值带 ←），操作页面的代码多一块白底的页面预览 |
 | `## 面试官可能追问` 下的 `::: details` | `data-kind="followups"` | 折叠卡片，自动编号 Q1、Q2 …… |
 | `## 易错点` 下的列表 | `data-kind="pitfalls"` | 红色感叹号清单 |
 | `**加粗**` | `strong` | 荧光笔划线效果 |

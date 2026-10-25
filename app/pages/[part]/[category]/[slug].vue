@@ -96,7 +96,12 @@ watch(() => question.value?.id, remember)
       <DocsQuestionHead :question="question" @interview="interview?.open()" />
 
       <div class="body-wrap" :class="{ veiled: hidden }">
-        <DocsQuestionBody :html="question.html" :inert="hidden" :aria-hidden="hidden" />
+        <DocsQuestionBody
+          :html="question.html"
+          :runnable="RUNNABLE_CATEGORIES.has(question.category.slug)"
+          :inert="hidden"
+          :aria-hidden="hidden"
+        />
         <div v-if="hidden" class="veil">
           <p class="veil-kicker">自测模式</p>
           <p class="veil-title serif">先自己答一遍，再看答案</p>

@@ -11,6 +11,7 @@ export default defineEventHandler((event) => {
     'Disallow: /api/',
     'Disallow: /mcp',
     'Disallow: /admin',
+    'Disallow: /sandbox/',
     '',
     `Sitemap: ${siteUrl}/sitemap.xml`,
     '',
